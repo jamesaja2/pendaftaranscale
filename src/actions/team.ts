@@ -15,6 +15,7 @@ const CreateTeamSchema = z.object({
   contactInfo: z.string(),
   category: z.enum(["JASA", "BARANG", "FNB"]),
   mainIngredientId: z.string().optional(),
+  mainIngredientName: z.string().optional(),
   boothLocationId: z.string().optional()
 });
 
@@ -28,7 +29,7 @@ export async function createTeamAction(data: z.infer<typeof CreateTeamSchema>) {
   if (!user) return { error: "User not found" };
   if (user.team) return { error: "You already have a team." };
 
-  const { name, leaderName, members, contactInfo, category, mainIngredientId, boothLocationId } = data;
+  const { name, leaderName, members, contactInfo, category, mainIngredientId, mainIngredientName, boothLocationId } = data;
 
   try {
       // 0. Check Global Settings Constraints
@@ -56,19 +57,31 @@ export async function createTeamAction(data: z.infer<typeof CreateTeamSchema>) {
 
     return await prisma.$transaction(async (tx) => {
         // 1. Check Ingredient Availability (if FnB)
+        let resolvedIngredientId = mainIngredientId;
+
         if (category === 'FNB') {
-            if (!mainIngredientId) throw new Error("Ingredient is required for FnB");
+            if (!mainIngredientId && !mainIngredientName) throw new Error("Ingredient is required for FnB");
             
+            // If Name provided but no ID (or ID empty), try to find or create
+            if (!resolvedIngredientId && mainIngredientName) {
+                 const existing = await tx.mainIngredient.findFirst({
+                    where: { name: { equals: mainIngredientName, mode: 'insensitive' } }
+                 });
+                 
+                 if (existing) {
+                     resolvedIngredientId = existing.id;
+                 } else {
+                     const newIng = await tx.mainIngredient.create({
+                         data: { name: mainIngredientName }
+                     });
+                     resolvedIngredientId = newIng.id;
+                 }
+            }
+
             // Count existing teams using this ingredient
-            // IMPORTANT: We count teams that have NOT expired or are PAID.
-            // Actually, safe bet: Count ALL teams linked to this ingredient. 
-            // If we allow expired teams to count, we block slots unnecessarily.
-            // But if we don't, we might have race conditions.
-            // Refined Logic: Count teams where paymentStatus = PAID OR (paymentStatus = PENDING AND now < paymentDeadline)
-            
             const usageCount = await tx.team.count({
                 where: {
-                    mainIngredientId,
+                    mainIngredientId: resolvedIngredientId,
                     OR: [
                         { paymentStatus: 'PAID' },
                         { paymentStatus: 'VERIFIED' },
@@ -153,7 +166,7 @@ export async function createTeamAction(data: z.infer<typeof CreateTeamSchema>) {
                 members,
                 contactInfo,
                 category,
-                mainIngredientId: category === 'FNB' ? mainIngredientId : undefined,
+                mainIngredientId: category === 'FNB' ? resolvedIngredientId : undefined,
                 boothLocationId,
                 userId: user.id,
                 paymentStatus: 'PENDING',
