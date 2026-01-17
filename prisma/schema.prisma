@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  PARTICIPANT
+}
+
+enum Category {
+  JASA
+  BARANG
+  FNB
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  VERIFIED
+  EXPIRED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  image     String?
+  role      Role     @default(PARTICIPANT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team      Team?
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String   @db.Text
+  createdAt DateTime @default(now())
+}
+
+model Student {
+  id        String   @id @default(cuid())
+  nis       String   @unique
+  name      String
+  class     String
+}
+
+model GlobalSettings {
+  id          String   @id @default(cuid())
+  key         String   @unique // guidebook, event_poster, slider_images, whatsapp_group_link, payment_qr_image, payment_gateway_id, payment_gateway_key, booth_layout
+  value       String   @db.Text
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model Resource {
+  id        String   @id @default(cuid())
+  title     String
+  fileUrl   String
+  createdAt DateTime @default(now())
+}
+
+model Team {
+  id              String   @id @default(cuid())
+  name            String?  // Made optional as it might be filled in step 3
+  
+  // Leader info from Student lookup
+  leaderNis       String?
+  leaderName      String?
+  leaderClass     String?
+  
+  // Members info (JSON array of { nis, name, class })
+  members         String?  @db.Text 
+  
+  contactInfo     String?
+  category        Category @default(FNB) // Default value for safety
+  
+  // Relations
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // FnB Specific
+  mainIngredientId String?
+  mainIngredient   Ingredient? @relation(fields: [mainIngredientId], references: [id])
+
+  // Location
+  boothLocationId String?  @unique
+  boothLocation   BoothLocation? @relation(fields: [boothLocationId], references: [id])
+
+  // Payment
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentTrxId    String?       @unique // YoGateway REF ID
+  paymentUrl      String?       // Deprecated if using embedded QR, but good to keep
+  paidAt          DateTime?
+  paymentDeadline DateTime?
+  
+  // Terms
+  acceptedTerms   Boolean       @default(false)
+  
+  // Dashboard Items
+  posUsername     String?
+  posPassword     String?
+  logo            String? 
+
+  // Submissions
+  bmcFile         String? 
+  bmcSubmittedAt  DateTime?
+
+  promoVideo      String?
+  promoPoster     String?
+  
+  inventoryFile   String?
+  inventorySubmittedAt DateTime?
+  
+  promotionalSubmittedAt DateTime?
+
+  // Admin Verification
+  verifiedAt      DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Ingredient {
+  id        String  @id @default(cuid())
+  name      String  @unique
+  
+  teams     Team[]  // One-to-Many inverted (Used by team.mainIngredient)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BoothLocation {
+  id        String  @id @default(cuid())
+  name      String  @unique // e.g., "A1", "B2"
+  
+  team      Team?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SystemConfig {
+  id              String @id @default(cuid())
+  key             String @unique // e.g. "bmc_due_date", "guidebook_url", "denah_url"
+  value           String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
