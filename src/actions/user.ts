@@ -58,6 +58,11 @@ export async function createUser(data: any) {
 
 export async function deleteUser(id: string) {
     try {
+        const existingUser = await prisma.user.findUnique({ where: { id } });
+        if (!existingUser) {
+            return { success: false, error: "User already removed or not found" };
+        }
+
         await prisma.user.delete({
             where: { id }
         });
