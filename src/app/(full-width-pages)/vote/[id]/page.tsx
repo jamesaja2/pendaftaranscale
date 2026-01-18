@@ -4,7 +4,7 @@ import React, { useEffect, useState, use } from 'react';
 import { getActiveVotingEvent, castVote } from "@/actions/voting";
 import { useSession, signIn } from "next-auth/react";
 import Button from "@/components/ui/button/Button";
-import { Link } from "next/link";
+import Link from "next/link";
 import Image from "next/image";
 import { useDialog } from "@/context/DialogContext";
 
