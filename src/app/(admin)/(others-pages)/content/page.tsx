@@ -8,6 +8,17 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { useDialog } from "@/context/DialogContext";
 
+type SliderItem = {
+    key: string;
+    url: string;
+    link: string;
+};
+
+type PendingSliderItem = {
+    file: File;
+    link: string;
+};
+
 export default function ContentPage() {
     const { showAlert, showConfirm } = useDialog();
     const [settings, setSettings] = useState<Record<string, string>>({});
@@ -24,7 +35,8 @@ export default function ContentPage() {
     const [guidebookFile, setGuidebookFile] = useState<File|null>(null);
     const [posterFile, setPosterFile] = useState<File|null>(null);
     const [boothLayoutFile, setBoothLayoutFile] = useState<File|null>(null);
-    const [sliderFiles, setSliderFiles] = useState<File[]>([]); // New for slider
+    const [sliderItems, setSliderItems] = useState<SliderItem[]>([]);
+    const [newSliderItems, setNewSliderItems] = useState<PendingSliderItem[]>([]);
 
     // Registration Settings
     const [minMembers, setMinMembers] = useState("1");
@@ -67,6 +79,35 @@ export default function ContentPage() {
         loadIngredients();
     }, []);
 
+    useEffect(() => {
+        if (!settings.slider_images) {
+            setSliderItems([]);
+            return;
+        }
+        try {
+            const parsed = JSON.parse(settings.slider_images);
+            if (Array.isArray(parsed)) {
+                const normalized: SliderItem[] = parsed
+                    .map((item: any) => {
+                        if (!item) return null;
+                        const key = item.key || item.image || item.path || "";
+                        const url = item.url || item.imageUrl || "";
+                        if (!key || !url) return null;
+                        return {
+                            key,
+                            url,
+                            link: item.link || ""
+                        };
+                    })
+                    .filter((item): item is SliderItem => item !== null);
+                setSliderItems(normalized);
+            }
+        } catch (error) {
+            console.warn("Failed to parse slider settings", error);
+            setSliderItems([]);
+        }
+    }, [settings.slider_images]);
+
     const loadIngredients = async () => {
         const res = await getIngredients();
         if (res.success && res.data) {
@@ -90,6 +131,22 @@ export default function ContentPage() {
         await loadIngredients();
         setSaving(false);
     }
+
+    const handleSliderLinkChange = (idx: number, link: string) => {
+        setSliderItems(prev => prev.map((item, i) => i === idx ? { ...item, link } : item));
+    };
+
+    const handleNewSliderLinkChange = (idx: number, link: string) => {
+        setNewSliderItems(prev => prev.map((item, i) => i === idx ? { ...item, link } : item));
+    };
+
+    const handleNewSliderFiles = (files: File[]) => {
+        if (!files || files.length === 0) return;
+        setNewSliderItems(prev => ([
+            ...prev,
+            ...files.map(file => ({ file, link: "" }))
+        ]));
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -116,10 +173,15 @@ export default function ContentPage() {
         if (guidebookFile) fd.append("setting_guidebook", guidebookFile);
         if (posterFile) fd.append("setting_event_poster", posterFile);
         if (boothLayoutFile) fd.append("setting_booth_layout", boothLayoutFile);
-        
-        // Append all slider files with same key
-        sliderFiles.forEach(f => {
-            fd.append("setting_slider_images", f);
+
+        fd.append(
+            "setting_slider_images_metadata",
+            JSON.stringify(sliderItems.map(item => ({ key: item.key, link: item.link || "" })))
+        );
+
+        newSliderItems.forEach(item => {
+            fd.append("setting_slider_images_new_metadata", JSON.stringify({ link: item.link || "" }));
+            fd.append("setting_slider_images_new_files", item.file);
         });
 
         const res = await updateContentSettings(fd);
@@ -135,7 +197,7 @@ export default function ContentPage() {
             setGuidebookFile(null);
             setPosterFile(null);
             setBoothLayoutFile(null);
-            setSliderFiles([]);
+            setNewSliderItems([]);
         } else {
             await showAlert("Failed to update settings.", "error");
         }
@@ -149,12 +211,6 @@ export default function ContentPage() {
         if (newSettings.data) setSettings(newSettings.data);
         setSaving(false);
     }
-    
-    // Parse slider images
-    let sliderImages: string[] = [];
-    try {
-        if (settings.slider_images) sliderImages = JSON.parse(settings.slider_images);
-    } catch (e) {}
 
     if (loading) return <div>Loading settings...</div>;
 
@@ -270,32 +326,65 @@ export default function ContentPage() {
                 {/* Slider Images Section */}
                 <div>
                      <Label>Slider Images</Label>
-                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                         {sliderImages.map((img, idx) => (
-                             <div key={idx} className="relative group border rounded p-1">
-                                 <img src={img} className="w-full h-32 object-cover rounded" />
-                                 <button 
-                                    type="button"
-                                    onClick={() => handleDeleteSlider(img)}
-                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-                                >&times;</button>
+                     <div className="space-y-4">
+                         {sliderItems.length > 0 && (
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                 {sliderItems.map((item, idx) => (
+                                     <div key={item.key} className="border rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900">
+                                         <div className="relative">
+                                             <img src={item.url} className="w-full h-32 object-cover" />
+                                             <button
+                                                 type="button"
+                                                 onClick={() => handleDeleteSlider(item.key)}
+                                                 className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center shadow"
+                                             >&times;</button>
+                                         </div>
+                                         <div className="p-3 space-y-2">
+                                             <Label className="text-xs">Link (optional)</Label>
+                                             <Input
+                                                 value={item.link || ""}
+                                                 onChange={(event) => handleSliderLinkChange(idx, event.target.value)}
+                                                 placeholder="https://example.com"
+                                             />
+                                         </div>
+                                     </div>
+                                 ))}
                              </div>
-                         ))}
-                     </div>
-                     <MultiFileUpload 
-                        label="Drag & Drop multiple slider images here"
-                        onFilesSelect={(files) => setSliderFiles(prev => [...prev, ...files])}
-                     />
-                     {sliderFiles.length > 0 && (
-                         <div className="mt-2 space-y-1">
-                             {sliderFiles.map((f, i) => (
-                                 <div key={i} className="text-xs bg-gray-100 p-1 flex justify-between">
-                                     <span>{f.name}</span>
-                                     <button type="button" onClick={()=>setSliderFiles(prev => prev.filter((_, idx)=> idx !== i))} className="text-red-500">&times;</button>
+                         )}
+
+                         <div>
+                             <MultiFileUpload
+                                 label="Drag & Drop new slider images here"
+                                 onFilesSelect={handleNewSliderFiles}
+                             />
+                             {newSliderItems.length > 0 && (
+                                 <div className="mt-3 space-y-3">
+                                     {newSliderItems.map((item, idx) => (
+                                         <div key={`${item.file.name}-${idx}`} className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-900">
+                                             <div className="flex justify-between items-center">
+                                                 <span className="text-sm font-medium">
+                                                     {item.file.name}
+                                                 </span>
+                                                 <button
+                                                     type="button"
+                                                     onClick={() => setNewSliderItems(prev => prev.filter((_, i) => i !== idx))}
+                                                     className="text-red-500 text-sm font-semibold"
+                                                 >Remove</button>
+                                             </div>
+                                             <div className="mt-2">
+                                                 <Label className="text-xs">Link (optional)</Label>
+                                                 <Input
+                                                     value={item.link}
+                                                     onChange={(event) => handleNewSliderLinkChange(idx, event.target.value)}
+                                                     placeholder="https://example.com"
+                                                 />
+                                             </div>
+                                         </div>
+                                     ))}
                                  </div>
-                             ))}
+                             )}
                          </div>
-                     )}
+                     </div>
                 </div>
 
                 <div className="h-px bg-gray-200 dark:bg-gray-700 my-6"></div>

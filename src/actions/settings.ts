@@ -2,7 +2,46 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { uploadToMinio, getPresignedUrl } from "@/lib/minio";
+import path from "path";
+import { uploadToMinio, getPresignedUrl, deleteFromMinio } from "@/lib/minio";
+
+type SliderRecord = {
+    key: string;
+    link?: string;
+};
+
+type SliderResponseRecord = SliderRecord & {
+    url: string;
+};
+
+function extractObjectKey(pathOrUrl: string) {
+    if (!pathOrUrl) return "";
+    if (!pathOrUrl.startsWith("http")) {
+        return pathOrUrl.replace(/^\/+/, "");
+    }
+    try {
+        const parsed = new URL(pathOrUrl);
+        const segments = parsed.pathname.split("/").filter(Boolean);
+        if (segments.length <= 1) return segments[0] || "";
+        return segments.slice(1).join("/");
+    } catch (error) {
+        console.warn("Failed to extract MinIO key", error);
+        return "";
+    }
+}
+
+function normalizeSliderRecord(raw: any): SliderRecord | null {
+    if (!raw) return null;
+    if (typeof raw === "string") {
+        return { key: raw, link: "" };
+    }
+    if (typeof raw === "object") {
+        const key = raw.key || raw.image || raw.path || raw.url || "";
+        if (!key) return null;
+        return { key, link: raw.link || "" };
+    }
+    return null;
+}
 
 export async function getGlobalSettings() {
     try {
@@ -17,12 +56,13 @@ export async function getGlobalSettings() {
                 if (val.startsWith("[") && val.endsWith("]")) {
                     const arr = JSON.parse(val);
                     if (Array.isArray(arr)) {
-                        const signedArr = await Promise.all(arr.map(async (item) => {
-                             if (typeof item === 'string' && !item.startsWith('http') && !item.startsWith('/')) {
-                                 return await getPresignedUrl(item);
-                             }
-                             return item;
-                        }));
+                        const signedArr: SliderResponseRecord[] = [];
+                        for (const item of arr) {
+                            const normalized = normalizeSliderRecord(item);
+                            if (!normalized) continue;
+                            const url = normalized.key ? await getPresignedUrl(normalized.key) : "";
+                            signedArr.push({ ...normalized, url });
+                        }
                         val = JSON.stringify(signedArr);
                     }
                 } else if (!val.startsWith('http') && !val.startsWith('/') && val.includes("content/")) {
@@ -49,7 +89,51 @@ export async function updateContentSettings(formData: FormData) {
         
         const entries = Array.from(formData.entries());
 
+        // Slider metadata (existing records) and new uploads
+        const sliderMetadataRaw = formData.get("setting_slider_images_metadata") as string | null;
+        let sliderRecords: SliderRecord[] = [];
+        if (sliderMetadataRaw) {
+            try {
+                const parsed = JSON.parse(sliderMetadataRaw);
+                if (Array.isArray(parsed)) {
+                    sliderRecords = parsed
+                        .map(normalizeSliderRecord)
+                        .filter((item): item is SliderRecord => !!item && !!item.key);
+                }
+            } catch (error) {
+                console.warn("Failed to parse slider metadata", error);
+            }
+        }
+
+        const sliderNewMetadataRaw = formData.getAll("setting_slider_images_new_metadata");
+        const sliderNewFilesRaw = formData.getAll("setting_slider_images_new_files");
+        const sliderNewItems: Array<{ file: File; link: string }> = [];
+
+        for (let i = 0; i < sliderNewFilesRaw.length; i++) {
+            const value = sliderNewFilesRaw[i];
+            if (!(value instanceof File) || value.size === 0) continue;
+            let link = "";
+            const metaRaw = sliderNewMetadataRaw[i];
+            if (typeof metaRaw === "string") {
+                try {
+                    const parsed = JSON.parse(metaRaw);
+                    if (parsed && typeof parsed === "object" && typeof parsed.link === "string") {
+                        link = parsed.link;
+                    }
+                } catch (error) {
+                    console.warn("Invalid slider metadata", error);
+                }
+            }
+            sliderNewItems.push({ file: value, link });
+        }
+
         for (const [key, value] of entries) {
+            if (key === "setting_slider_images_metadata" ||
+                key === "setting_slider_images_new_metadata" ||
+                key === "setting_slider_images_new_files") {
+                continue;
+            }
+
             if (!key.startsWith("setting_")) continue;
             
             const settingKey = key.replace("setting_", "");
@@ -68,30 +152,45 @@ export async function updateContentSettings(formData: FormData) {
                      continue;
                 }
 
-                // Logic for slider_images: Append to existing array
-                if (settingKey === "slider_images") {
-                    const currentSetting = await prisma.globalSettings.findUnique({ where: { key: "slider_images" } });
-                    let images: string[] = [];
-                    try {
-                        if (currentSetting?.value) images = JSON.parse(currentSetting.value);
-                    } catch (e) {}
-                    
-                    images.push(filePath);
-                    storedValue = JSON.stringify(images);
-                } else {
-                    storedValue = filePath;
-                }
+                storedValue = filePath;
             } else {
                 storedValue = value as string;
             }
 
             if (storedValue) {
-               await prisma.globalSettings.upsert({
-                   where: { key: settingKey },
-                   update: { value: storedValue },
-                   create: { key: settingKey, value: storedValue }
-               });
+                await prisma.globalSettings.upsert({
+                    where: { key: settingKey },
+                    update: { value: storedValue },
+                    create: { key: settingKey, value: storedValue }
+                });
             }
+        }
+
+        const sliderMetadataProvided = sliderMetadataRaw !== null;
+
+        if (sliderMetadataProvided || sliderNewItems.length > 0) {
+            const finalSlider: SliderRecord[] = sliderRecords.filter(item => item.key);
+
+            for (const item of sliderNewItems) {
+                try {
+                    const ext = path.extname(item.file.name || "") || ".png";
+                    const baseName = path
+                        .basename(item.file.name || "slider", ext)
+                        .replace(/\s+/g, "-") || "slider";
+                    const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+                    const filename = `${uniqueSuffix}-${baseName}${ext}`;
+                    const key = await uploadToMinio(item.file, filename, "content");
+                    finalSlider.push({ key, link: item.link || "" });
+                } catch (error) {
+                    console.error("Slider upload failed", error);
+                }
+            }
+
+            await prisma.globalSettings.upsert({
+                where: { key: "slider_images" },
+                update: { value: JSON.stringify(finalSlider) },
+                create: { key: "slider_images", value: JSON.stringify(finalSlider) }
+            });
         }
 
         revalidatePath("/content");
@@ -104,17 +203,29 @@ export async function updateContentSettings(formData: FormData) {
 
 export async function deleteSliderImage(imagePath: string) {
     try {
+        const normalizedKey = extractObjectKey(imagePath);
+        if (!normalizedKey) return { success: false };
         const currentSetting = await prisma.globalSettings.findUnique({ where: { key: "slider_images" } });
         if (!currentSetting?.value) return { success: false };
         
-        let images: string[] = [];
+        let images: any[] = [];
         try {
             images = JSON.parse(currentSetting.value);
         } catch (e) {
             return { success: false };
         }
 
-        const newImages = images.filter(img => img !== imagePath);
+        const newImages: SliderRecord[] = [];
+        for (const item of images) {
+            const normalized = normalizeSliderRecord(item);
+            if (!normalized) continue;
+            if (normalized.key === normalizedKey) continue;
+            newImages.push(normalized);
+        }
+
+        if (newImages.length === images.length) return { success: false };
+
+        await deleteFromMinio(normalizedKey);
         
         await prisma.globalSettings.update({
             where: { key: "slider_images" },

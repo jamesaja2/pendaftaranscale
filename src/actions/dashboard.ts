@@ -4,7 +4,28 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { uploadToMinio } from "@/lib/minio";
+import { uploadToMinio, getPresignedUrl } from "@/lib/minio";
+import path from "path";
+
+type SliderRecord = {
+    key: string;
+    link?: string;
+};
+
+type SliderResponseRecord = SliderRecord & { url: string };
+
+function normalizeSliderRecord(raw: any): SliderRecord | null {
+    if (!raw) return null;
+    if (typeof raw === "string") {
+        return { key: raw };
+    }
+    if (typeof raw === "object") {
+        const key = raw.key || raw.image || raw.path || raw.url || "";
+        if (!key) return null;
+        return { key, link: raw.link || "" };
+    }
+    return null;
+}
 
 export async function getDashboardData() {
   const session = await getServerSession(authOptions);
@@ -51,6 +72,27 @@ export async function getDashboardData() {
   const whatsappSetting = await prisma.globalSettings.findUnique({ where: { key: 'whatsapp_group_link' }});
   const eventPosterSetting = await prisma.globalSettings.findUnique({ where: { key: 'event_poster' }});
   const sliderImagesSetting = await prisma.globalSettings.findUnique({ where: { key: 'slider_images' }});
+  let sliderImagesPayload: string | null = null;
+  if (sliderImagesSetting?.value) {
+      try {
+          const parsed = JSON.parse(sliderImagesSetting.value);
+          if (Array.isArray(parsed)) {
+              const signed: SliderResponseRecord[] = [];
+              for (const item of parsed) {
+                  const normalized = normalizeSliderRecord(item);
+                  if (!normalized) continue;
+                  const url = await getPresignedUrl(normalized.key);
+                  if (!url) continue;
+                  signed.push({ ...normalized, url });
+              }
+              sliderImagesPayload = JSON.stringify(signed);
+          } else {
+              sliderImagesPayload = sliderImagesSetting.value;
+          }
+      } catch (error) {
+          sliderImagesPayload = sliderImagesSetting.value;
+      }
+  }
   const boothLayoutSetting = await prisma.globalSettings.findUnique({ where: { key: 'booth_layout' }});
   
   // Dates
@@ -90,7 +132,7 @@ export async function getDashboardData() {
           paymentQr: paymentQrSetting?.value || null,
           guidebook: guidebookSetting?.value || null,
           eventPoster: eventPosterSetting?.value || null,
-          sliderImages: sliderImagesSetting?.value || null, // Expect JSON string
+          sliderImages: sliderImagesPayload,
           boothLayout: boothLayoutSetting?.value || null,
           whatsappLink: whatsappSetting?.value || null,
           dueDates,
@@ -130,6 +172,8 @@ export async function setPosCredentials(teamId: string, formData: FormData) {
 export async function updateTeamProfile(teamId: string, formData: FormData) {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) return { error: "Unauthorized" };
+    const team = await prisma.team.findUnique({ where: { id: teamId } });
+    if (!team) return { error: "Team not found" };
     
     // In real app, handle file upload here (e.g., to S3 or local disk).
     // For now, we simulate by assuming the frontend passed a string or we just store "Uploaded" marker.
@@ -147,9 +191,24 @@ export async function updateTeamProfile(teamId: string, formData: FormData) {
     }
     
     // Mock file upload
-    const logoFile = formData.get("logo") as File;
-    if (logoFile && logoFile.size > 0) {
-        data.logo = "/images/brand/brand-01.svg"; // Mock path
+    const logoFile = formData.get("logo") as File | null;
+    if (
+        logoFile &&
+        typeof logoFile.arrayBuffer === "function" &&
+        logoFile.size > 0
+    ) {
+        try {
+            const ext = path.extname(logoFile.name || "") || ".png";
+            const baseName = path
+                .basename(logoFile.name || "team-logo", ext)
+                .replace(/\s+/g, "-") || "team-logo";
+            const filename = `${teamId}-${Date.now()}-${baseName}${ext}`;
+            const logoPath = await uploadToMinio(logoFile, filename, "team-logos");
+            data.logo = logoPath;
+        } catch (error) {
+            console.error("Team logo upload failed:", error);
+            return { error: "Failed to upload team logo" };
+        }
     }
 
     await prisma.team.update({
@@ -414,9 +473,22 @@ export async function completeTeamRegistration(teamId: string, formData: FormDat
              }
 
              // Handle Logo Upload (Mock)
-             const logoFile = formData.get("logo") as File;
-             if (logoFile && logoFile.size > 0) {
-                 data.logo = "/images/brand/brand-01.svg"; 
+             const logoFile = formData.get("logo") as File | null;
+             if (
+                 logoFile &&
+                 typeof logoFile.arrayBuffer === "function" &&
+                 logoFile.size > 0
+             ) {
+                 try {
+                     const ext = path.extname(logoFile.name || "") || ".png";
+                     const baseName = path
+                         .basename(logoFile.name || "team-logo", ext)
+                         .replace(/\s+/g, "-") || "team-logo";
+                     const filename = `${teamId}-${Date.now()}-${baseName}${ext}`;
+                     data.logo = await uploadToMinio(logoFile, filename, "team-logos");
+                 } catch (err) {
+                     throw new Error("Failed to upload logo");
+                 }
              }
 
              await tx.team.update({

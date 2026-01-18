@@ -122,11 +122,32 @@ function WelcomeSection({ team, meta }: { team: any, meta: any }) {
 // INFO SECTION
 // ----------------------------------------------------------------------
 function InformationSection({ meta }: { meta: any }) {
-    let sliderImages: any[] = [];
+    type SliderData = {
+        url: string;
+        link?: string;
+    };
+
+    let sliderImagesRaw: any[] = [];
+    let sliderImages: SliderData[] = [];
     try {
-        if (meta.sliderImages) sliderImages = JSON.parse(meta.sliderImages);
-        if (!Array.isArray(sliderImages)) sliderImages = [];
-    } catch (e) { sliderImages = []; }
+        if (meta.sliderImages) sliderImagesRaw = JSON.parse(meta.sliderImages);
+        if (!Array.isArray(sliderImagesRaw)) sliderImagesRaw = [];
+    } catch (e) { sliderImagesRaw = []; }
+
+    sliderImages = sliderImagesRaw.reduce<SliderData[]>((acc, item: any) => {
+        if (!item) return acc;
+        if (typeof item === "string") {
+            acc.push({ url: item, link: undefined });
+            return acc;
+        }
+        if (typeof item === "object") {
+            const url = item.url || item.image || item.path || item.key;
+            if (!url) return acc;
+            acc.push({ url, link: item.link || undefined });
+            return acc;
+        }
+        return acc;
+    }, []);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -144,9 +165,9 @@ function InformationSection({ meta }: { meta: any }) {
                         className="h-full w-full"
                     >
                         {sliderImages.map((item, idx) => {
-                            const src = typeof item === 'object' ? item.url : item;
-                            const link = typeof item === 'object' ? item.link : null;
-                            
+                            const src = item.url;
+                            const link = item.link;
+
                             const Content = (
                                 <div className="w-full h-full relative">
                                     <img src={src} alt={`Slide ${idx}`} className="absolute inset-0 w-full h-full object-cover" />
