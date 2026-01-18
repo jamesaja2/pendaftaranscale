@@ -412,6 +412,7 @@ function MainIngredientCombobox({ items, selectedId, selectedName, onChange }: a
 // ----------------------------------------------------------------------
 
 function PaymentSection({ team, meta }: { team: any, meta: any }) {
+    const { showAlert, showConfirm } = useDialog();
     const [timeLeft, setTimeLeft] = useState("");
     const [expired, setExpired] = useState(false);
     const [loading, setLoading] = useState(false);
