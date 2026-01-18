@@ -32,6 +32,11 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        if (!user.password) {
+          console.log(`Login Failed: No password hash stored for ${credentials.email}`);
+          return null;
+        }
+
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.password
@@ -66,7 +71,10 @@ export const authOptions: NextAuthOptions = {
         // The voting page will check for specific domain restrictions, 
         // allowing all google users to at least login (per requirements).
         
-        let dbUser = await prisma.user.findUnique({ where: { email: user.email } });
+        let dbUser = await prisma.user.findUnique({ 
+          where: { email: user.email },
+          include: { team: true }
+        });
         
         if (!dbUser) {
            dbUser = await prisma.user.create({
@@ -76,14 +84,16 @@ export const authOptions: NextAuthOptions = {
                image: user.image,
                role: 'PARTICIPANT', // Default role
                password: null, // No password for OAuth
-             }
+             },
+             include: { team: true }
            });
         }
         
         // Pass user info to logic
         user.id = dbUser.id;
         (user as any).role = dbUser.role;
-        (user as any).hasTeam = !!dbUser.team; // Prisma include needed if we want this, but for create it's false
+        const hasTeam = Array.isArray(dbUser.team) ? dbUser.team.length > 0 : !!dbUser.team;
+        (user as any).hasTeam = hasTeam; // Prisma include needed if we want this, but for create it's false
         
         return true;
       }
