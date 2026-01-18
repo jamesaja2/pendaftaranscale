@@ -92,8 +92,9 @@ export default function VotingPage() {
                 {events.length === 0 && <p className="text-center text-gray-500">No events found.</p>}
              </div>
              
-             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Voting Event">
+             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <div className="p-4 flex flex-col gap-4">
+                    <h3 className="text-xl font-bold dark:text-white mb-2">New Voting Event</h3>
                     <div>
                         <Label>Title</Label>
                         <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Best Booth 2024" />
