@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { uploadToMinio, getPresignedUrl } from "@/lib/minio";
+import { uploadToFileServer, getPublicFileUrl } from "@/lib/fileServer";
 import path from "path";
 
 type SliderRecord = {
@@ -29,9 +29,7 @@ function normalizeSliderRecord(raw: any): SliderRecord | null {
 
 async function resolveSignedSettingValue(setting?: { value: string | null } | null) {
     if (!setting?.value) return null;
-    if (setting.value.startsWith("http")) return setting.value;
-    const signed = await getPresignedUrl(setting.value);
-    return signed || setting.value;
+    return getPublicFileUrl(setting.value);
 }
 
 type SerializedSubmission = {
@@ -83,7 +81,7 @@ async function getParticipantSubmissionTasks(teamId?: string | null): Promise<Se
     return Promise.all(
         tasks.map(async (task: any) => {
             const submission = task.submissions?.[0];
-            const fileDownloadUrl = submission?.fileUrl ? await getPresignedUrl(submission.fileUrl) : null;
+            const fileDownloadUrl = submission?.fileUrl ? getPublicFileUrl(submission.fileUrl) : null;
             return {
                 id: task.id,
                 title: task.title,
@@ -136,7 +134,7 @@ async function getAdminSubmissionTasks(): Promise<SerializedAdminSubmissionTask[
                 task.submissions.map(async (submission) => ({
                     id: submission.id,
                     fileUrl: submission.fileUrl || null,
-                    fileDownloadUrl: submission.fileUrl ? await getPresignedUrl(submission.fileUrl) : null,
+                    fileDownloadUrl: submission.fileUrl ? getPublicFileUrl(submission.fileUrl) : null,
                     linkUrl: submission.linkUrl || null,
                     submittedAt: submission.submittedAt.toISOString(),
                     isLate: submission.isLate,
@@ -222,7 +220,7 @@ export async function getDashboardData() {
               for (const item of parsed) {
                   const normalized = normalizeSliderRecord(item);
                   if (!normalized) continue;
-                  const url = await getPresignedUrl(normalized.key);
+                  const url = getPublicFileUrl(normalized.key);
                   if (!url) continue;
                   signed.push({ ...normalized, url });
               }
@@ -382,7 +380,7 @@ export async function updateTeamProfile(teamId: string, formData: FormData) {
                 .basename(logoFile.name || "team-logo", ext)
                 .replace(/\s+/g, "-") || "team-logo";
             const filename = `${teamId}-${Date.now()}-${baseName}${ext}`;
-            const logoPath = await uploadToMinio(logoFile, filename, "team-logos");
+            const logoPath = await uploadToFileServer(logoFile, filename, "team-logos");
             data.logo = logoPath;
         } catch (error) {
             console.error("Team logo upload failed:", error);
@@ -436,7 +434,7 @@ export async function uploadSubmission(teamId: string, taskId: string, formData:
             const base = path.basename(file.name || "submission", ext).replace(/[^a-zA-Z0-9-_]/g, "_");
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
             const finalFilename = `${teamId}-${taskId}-${base || 'submission'}-${uniqueSuffix}${ext}`;
-            uploadedFilePath = await uploadToMinio(file, finalFilename, "submissions");
+            uploadedFilePath = await uploadToFileServer(file, finalFilename, "submissions");
         } catch (error) {
             console.error("Upload error:", error);
             return { error: "Failed to upload file to storage" };
@@ -781,7 +779,7 @@ export async function completeTeamRegistration(teamId: string, formData: FormDat
                          .basename(logoFile.name || "team-logo", ext)
                          .replace(/\s+/g, "-") || "team-logo";
                      const filename = `${teamId}-${Date.now()}-${baseName}${ext}`;
-                     data.logo = await uploadToMinio(logoFile, filename, "team-logos");
+                     data.logo = await uploadToFileServer(logoFile, filename, "team-logos");
                  } catch (err) {
                      throw new Error("Failed to upload logo");
                  }

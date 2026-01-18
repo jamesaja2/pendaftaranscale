@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 // Max file size 50MB (handled by frontend usually, but good to know)
-import { uploadToMinio, getPresignedUrl } from "@/lib/minio";
+import { uploadToFileServer, getPublicFileUrl } from "@/lib/fileServer";
 
 export async function getResources() {
   try {
@@ -15,11 +15,10 @@ export async function getResources() {
     // Generate presigned URLs for each resource
     const processedResources = await Promise.all(resources.map(async (r) => {
         if (r.fileUrl && !r.fileUrl.startsWith('http')) {
-            // It's a MinIO key
-            r.fileUrl = await getPresignedUrl(r.fileUrl);
-        } else if (r.fileUrl && r.fileUrl.includes(process.env.MINIO_ENDPOINT || 'minio')) {
-            // It's a legacy MinIO URL
-            r.fileUrl = await getPresignedUrl(r.fileUrl);
+          const resolved = getPublicFileUrl(r.fileUrl);
+          if (resolved) {
+            r.fileUrl = resolved;
+          }
         }
         return r;
     }));
@@ -51,7 +50,7 @@ export async function createResource(formData: FormData) {
             const filename = file.name.replace(/[^a-zA-Z0-9.]/g, "_");
             const finalFilename = `${uniqueSuffix}-${filename}`;
             
-            fileUrl = await uploadToMinio(file, finalFilename, "resources");
+            fileUrl = await uploadToFileServer(file, finalFilename, "resources");
         } catch (error) {
             console.error(error);
             return { success: false, error: "Failed to upload file" };

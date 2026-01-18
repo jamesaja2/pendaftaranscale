@@ -5,7 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth"; // Assuming authOptions is exported here, if not need to find it
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
-import { uploadToMinio, getPresignedUrl } from "@/lib/minio";
+import { uploadToFileServer, getPublicFileUrl } from "@/lib/fileServer";
 import path from "path";
 
 export async function getUserProfile() {
@@ -23,8 +23,8 @@ export async function getUserProfile() {
     if (!user) return { error: "User not found" };
 
     // Sign user image if exists and not external
-    if (user.image && !user.image.startsWith("http") && !user.image.startsWith("/")) {
-         user.image = await getPresignedUrl(user.image);
+        if (user.image && !user.image.startsWith("http") && !user.image.startsWith("/")) {
+            user.image = getPublicFileUrl(user.image);
     } 
 
     return { success: true, user };
@@ -53,7 +53,7 @@ export async function updateUserProfile(formData: FormData) {
             const ext = path.extname(imageFile.name) || ".jpg";
             const filename = `user-${user.id}-${Date.now()}${ext}`;
             
-            imageUrl = await uploadToMinio(imageFile, filename, "users");
+            imageUrl = await uploadToFileServer(imageFile, filename, "users");
         } catch (error) {
             console.error("Image upload failed:", error);
             return { error: "Failed to upload image" };

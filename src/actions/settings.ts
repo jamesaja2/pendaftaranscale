@@ -3,7 +3,7 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import path from "path";
-import { uploadToMinio, getPresignedUrl, deleteFromMinio } from "@/lib/minio";
+import { uploadToFileServer, getPublicFileUrl, deleteFromFileServer, extractFileKey } from "@/lib/fileServer";
 
 type SliderRecord = {
     key: string;
@@ -13,22 +13,6 @@ type SliderRecord = {
 type SliderResponseRecord = SliderRecord & {
     url: string;
 };
-
-function extractObjectKey(pathOrUrl: string) {
-    if (!pathOrUrl) return "";
-    if (!pathOrUrl.startsWith("http")) {
-        return pathOrUrl.replace(/^\/+/, "");
-    }
-    try {
-        const parsed = new URL(pathOrUrl);
-        const segments = parsed.pathname.split("/").filter(Boolean);
-        if (segments.length <= 1) return segments[0] || "";
-        return segments.slice(1).join("/");
-    } catch (error) {
-        console.warn("Failed to extract MinIO key", error);
-        return "";
-    }
-}
 
 function normalizeSliderRecord(raw: any): SliderRecord | null {
     if (!raw) return null;
@@ -60,14 +44,14 @@ export async function getGlobalSettings() {
                         for (const item of arr) {
                             const normalized = normalizeSliderRecord(item);
                             if (!normalized) continue;
-                            const url = normalized.key ? await getPresignedUrl(normalized.key) : "";
+                                const url = normalized.key ? getPublicFileUrl(normalized.key) || "" : "";
                             signedArr.push({ ...normalized, url });
                         }
                         val = JSON.stringify(signedArr);
                     }
                 } else if (!val.startsWith('http') && !val.startsWith('/') && val.includes("content/")) {
-                    // Check if likely a minio key (simple heuristic or checking folder)
-                    val = await getPresignedUrl(val);
+                    const resolved = getPublicFileUrl(val);
+                    if (resolved) val = resolved;
                 }
              } catch (e) {
                  // ignore parse errors
@@ -146,7 +130,7 @@ export async function updateContentSettings(formData: FormData) {
                 let filePath = "";
                 try {
                      const fileName = `${Date.now()}-${value.name.replaceAll(" ", "_")}`;
-                     filePath = await uploadToMinio(value, fileName, "content");
+                     filePath = await uploadToFileServer(value, fileName, "content");
                 } catch (e) {
                      console.error("Upload failed", e);
                      continue;
@@ -179,7 +163,7 @@ export async function updateContentSettings(formData: FormData) {
                         .replace(/\s+/g, "-") || "slider";
                     const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
                     const filename = `${uniqueSuffix}-${baseName}${ext}`;
-                    const key = await uploadToMinio(item.file, filename, "content");
+                    const key = await uploadToFileServer(item.file, filename, "content");
                     finalSlider.push({ key, link: item.link || "" });
                 } catch (error) {
                     console.error("Slider upload failed", error);
@@ -203,7 +187,7 @@ export async function updateContentSettings(formData: FormData) {
 
 export async function deleteSliderImage(imagePath: string) {
     try {
-        const normalizedKey = extractObjectKey(imagePath);
+        const normalizedKey = extractFileKey(imagePath);
         if (!normalizedKey) return { success: false };
         const currentSetting = await prisma.globalSettings.findUnique({ where: { key: "slider_images" } });
         if (!currentSetting?.value) return { success: false };
@@ -225,7 +209,7 @@ export async function deleteSliderImage(imagePath: string) {
 
         if (newImages.length === images.length) return { success: false };
 
-        await deleteFromMinio(normalizedKey);
+        await deleteFromFileServer(normalizedKey);
         
         await prisma.globalSettings.update({
             where: { key: "slider_images" },
