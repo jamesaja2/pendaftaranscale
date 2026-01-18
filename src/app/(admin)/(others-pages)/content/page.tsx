@@ -5,6 +5,7 @@ import { getIngredients, createIngredient, deleteIngredient } from "@/actions/in
 import FileUpload from "@/components/form/FileUpload";
 import MultiFileUpload from "@/components/form/MultiFileUpload";
 import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
 import Label from "@/components/form/Label";
 import { useDialog } from "@/context/DialogContext";
 
@@ -43,6 +44,7 @@ export default function ContentPage() {
     const [maxMembers, setMaxMembers] = useState("5");
     const [regOpen, setRegOpen] = useState("true"); // Stored as "true"/"false" string
     const [regFee, setRegFee] = useState("0");
+    const [regMessage, setRegMessage] = useState("");
     
     // Due Dates
     const [bmcDue, setBmcDue] = useState("");
@@ -67,6 +69,7 @@ export default function ContentPage() {
                 setMaxMembers(res.data.max_team_members || "5");
                 setRegOpen(res.data.registration_open || "true");
                 setRegFee(res.data.registration_fee || "0");
+                setRegMessage(res.data.registration_close_message || "");
                 
                 // Load Dates
                 setBmcDue(res.data.bmc_due_date || "");
@@ -162,6 +165,7 @@ export default function ContentPage() {
         fd.append("setting_max_team_members", maxMembers);
         fd.append("setting_registration_open", regOpen);
         fd.append("setting_registration_fee", regFee);
+        fd.append("setting_registration_close_message", regMessage);
         
         // Append Due Dates
         fd.append("setting_bmc_due_date", bmcDue);
@@ -191,6 +195,9 @@ export default function ContentPage() {
             // Refresh settings
             const newSettings = await getGlobalSettings();
             if (newSettings.data) setSettings(newSettings.data);
+            if (newSettings.data) {
+                setRegMessage(newSettings.data.registration_close_message || "");
+            }
             
             // Clear file inputs
             setQrFile(null);
@@ -263,6 +270,16 @@ export default function ContentPage() {
                              <Label>Max Members</Label>
                              <Input type="number" value={maxMembers} onChange={(e) => setMaxMembers(e.target.value)} />
                         </div>
+                            <div className="md:col-span-2">
+                                <Label>Closed Registration Message</Label>
+                                <TextArea
+                                  rows={3}
+                                  value={regMessage}
+                                  onChange={setRegMessage}
+                                  placeholder="Pesan yang ditampilkan ketika pendaftaran ditutup"
+                                  hint="Ditampilkan kepada peserta baru ketika registrasi dinonaktifkan."
+                                />
+                            </div>
                     </div>
                 </div>
 

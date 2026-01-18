@@ -1,93 +1,111 @@
-import * as Minio from 'minio';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const minioClient = new Minio.Client({
-  endPoint: process.env.MINIO_ENDPOINT || 'localhost',
-  port: parseInt(process.env.MINIO_PORT || '9000'),
-  useSSL: process.env.MINIO_SSL === 'true',
-  accessKey: process.env.MINIO_ACCESS_KEY || '',
-  secretKey: process.env.MINIO_SECRET_KEY || '',
+// Supabase S3 Configuration
+const s3Client = new S3Client({
+    region: process.env.S3_REGION || "ap-southeast-1",
+    endpoint: process.env.S3_ENDPOINT || "https://uhodcquzbfoytkkwfpdj.storage.supabase.co/storage/v1/s3",
+    credentials: {
+        accessKeyId: process.env.S3_ACCESS_KEY || "",
+        secretAccessKey: process.env.S3_SECRET_KEY || "",
+    },
+    forcePathStyle: true, // Supabase usually requires this or auto-detects
 });
 
-const BUCKET_NAME = process.env.MINIO_BUCKET || 'scalekopsis';
+const BUCKET_NAME = process.env.S3_BUCKET || 'scalekopsis';
 
-// Helper to ensure bucket exists and is public
+// Helper to ensure bucket exists
+// Note: We assume the bucket is managed via Supabase UI
 let bucketChecked = false;
 
 async function ensureBucket() {
     if (bucketChecked) return;
     try {
-        const bucketExists = await minioClient.bucketExists(BUCKET_NAME);
-        if(!bucketExists) {
-            await minioClient.makeBucket(BUCKET_NAME, 'us-east-1');
-            const policy = {
-                Version: "2012-10-17",
-                Statement: [
-                    {
-                        Effect: "Allow",
-                        Principal: { AWS: ["*"] },
-                        Action: ["s3:GetObject"],
-                        Resource: [`arn:aws:s3:::${BUCKET_NAME}/*`]
-                    }
-                ]
-            };
-            await minioClient.setBucketPolicy(BUCKET_NAME, JSON.stringify(policy));
-            console.log(`Bucket ${BUCKET_NAME} created and set to public.`);
-        }
+        await s3Client.send(new HeadBucketCommand({ Bucket: BUCKET_NAME }));
         bucketChecked = true;
     } catch (error) {
-        console.error("Error ensuring bucket exists:", error);
+        console.error(`Bucket ${BUCKET_NAME} check failed. Ensure it exists in Supabase.`, error);
     }
 }
 
 export async function uploadToMinio(file: File | Buffer, filename: string, folder: string = ''): Promise<string> {
-    await ensureBucket();
-
-    // Use Buffer directly from Buffer or await arrayBuffer for File
     const buffer = Buffer.isBuffer(file) ? file : Buffer.from(await (file as File).arrayBuffer());
-    const size = buffer.length;
-
     // Detect MetaData (ContentType) if possible
-    const metaData = {
-        'Content-Type': (file as any).type || 'application/octet-stream',
-    };
+    const contentType = (file as any).type || 'application/octet-stream';
     
     // Ensure filename is clean
     const cleanFilename = filename.replace(/\s+/g, '-');
     const objectName = folder ? `${folder}/${cleanFilename}` : cleanFilename;
 
-    await minioClient.putObject(BUCKET_NAME, objectName, buffer, size, metaData);
-
-    // Return the object name (Key) to be stored in DB
-    // We will generate Presigned URLs for access since the bucket is private
-    return objectName;
+    try {
+        await s3Client.send(new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: objectName,
+            Body: buffer,
+            ContentType: contentType,
+        }));
+        
+        return objectName;
+    } catch (error) {
+        console.error("Supabase S3 Upload Error:", error);
+        throw new Error("Failed to upload to storage");
+    }
 }
 
 export async function getPresignedUrl(objectName: string): Promise<string> {
-    await ensureBucket();
     try {
-        // Jika objectName adalah full URL (legacy), kita coba ambil key-nya
-        if (objectName.startsWith('http')) {
-            const url = new URL(objectName);
-            const pathParts = url.pathname.split('/');
-            // format: /bucketName/folder/file
-            // kita butuh folder/file.
-            // pathParts[0] is empty, [1] is bucket
-            objectName = pathParts.slice(2).join('/');
+        if (!objectName) return "";
+        let key = objectName;
+
+        // Handle legacy full URLs if necessary
+        if (objectName.startsWith("http")) {
+            try {
+                const url = new URL(objectName);
+                const pathParts = url.pathname.split('/');
+                // Logic to extract Key from Supabase URL if stored as URL
+                // e.g. /storage/v1/s3/bucket/folder/file OR /bucket/folder/file
+                // We'll search for bucket name index
+                const bucketIndex = pathParts.indexOf(BUCKET_NAME);
+                if (bucketIndex >= 0 && bucketIndex < pathParts.length - 1) {
+                    key = pathParts.slice(bucketIndex + 1).join('/');
+                }
+            } catch (e) { /* ignore */ }
         }
 
-        // Generate URL valid for 7 days (604800 seconds)
-        return await minioClient.presignedGetObject(BUCKET_NAME, objectName, 24*60*60);
+        const command = new GetObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key,
+        });
+        
+        // Expires in 7 days (64800s is 18 hours? minio used 604800 for 7 days)
+        // Set to 7 days = 604800
+        return await getSignedUrl(s3Client, command, { expiresIn: 604800 });
     } catch (error) {
-        console.error("Error generating presigned URL:", error);
+        console.error("Presign Error:", error);
         return "";
     }
 }
 
 export async function deleteFromMinio(objectName: string) {
-    await ensureBucket();
     try {
-        await minioClient.removeObject(BUCKET_NAME, objectName);
+        let key = objectName;
+        // Logic to extract key if full URL passed
+        if (objectName.startsWith("http")) {
+            try {
+                const url = new URL(objectName);
+                const pathParts = url.pathname.split('/');
+                const bucketIndex = pathParts.indexOf(BUCKET_NAME);
+                if (bucketIndex >= 0 && bucketIndex < pathParts.length - 1) {
+                    key = pathParts.slice(bucketIndex + 1).join('/');
+                }
+            } catch(e) {}
+        }
+
+        await s3Client.send(new DeleteObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key,
+        }));
     } catch (error) {
-        console.error("MinIO Delete Error:", error);
+        console.error("Delete Error:", error);
     }
 }

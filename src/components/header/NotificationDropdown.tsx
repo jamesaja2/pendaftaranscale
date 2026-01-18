@@ -106,8 +106,8 @@ export default function NotificationDropdown() {
                             {notif.title}
                         </span>
                         </span>
-                         <span className="block text-theme-xs text-gray-500 dark:text-gray-400">
-                            {notif.message.length > 50 ? notif.message.substring(0, 50) + "..." : notif.message}
+                         <span className="block text-theme-xs text-gray-500 dark:text-gray-400 whitespace-pre-line break-words">
+                           {notif.message}
                          </span>
 
                         <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400 mt-1">

@@ -256,11 +256,9 @@ export default function AdminView({ teams, settings }: { teams: any[], settings:
 
                              <div className="border-t pt-2">
                                  <label className="text-xs text-gray-500 uppercase mb-2 block">Submission Status</label>
-                                 <div className="grid grid-cols-2 gap-2 text-sm">
-                                     <div>BMC: <span className={viewTeam.bmcSubmittedAt ? "text-green-600 font-bold" : "text-gray-400"}>{viewTeam.bmcSubmittedAt ? "Submitted" : "Pending"}</span></div>
-                                     <div>Video: <span className={viewTeam.promotionalSubmittedAt ? "text-green-600 font-bold" : "text-gray-400"}>{viewTeam.promotionalSubmittedAt ? "Submitted" : "Pending"}</span></div>
-                                     <div>Inventory: <span className={viewTeam.inventorySubmittedAt ? "text-green-600 font-bold" : "text-gray-400"}>{viewTeam.inventorySubmittedAt ? "Submitted" : "Pending"}</span></div>
-                                 </div>
+                                 <p className="text-sm text-gray-500">
+                                     View detailed progress on the Submissions page.
+                                 </p>
                              </div>
                              
                              <div className="border-t pt-4">

@@ -129,6 +129,7 @@ function InformationSection({ meta }: { meta: any }) {
 
     let sliderImagesRaw: any[] = [];
     let sliderImages: SliderData[] = [];
+    const announcements = Array.isArray(meta?.announcements) ? meta.announcements : [];
     try {
         if (meta.sliderImages) sliderImagesRaw = JSON.parse(meta.sliderImages);
         if (!Array.isArray(sliderImagesRaw)) sliderImagesRaw = [];
@@ -148,6 +149,10 @@ function InformationSection({ meta }: { meta: any }) {
         }
         return acc;
     }, []);
+
+    const rightColumnClass = sliderImages.length > 0
+        ? 'lg:col-span-1 flex flex-col gap-6'
+        : 'lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6';
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -189,16 +194,39 @@ function InformationSection({ meta }: { meta: any }) {
             )}
             </div>
             
-            {/* Right: Info & Links (Takes 1 col, expands if no slider) */}
-            <div className={`${sliderImages.length > 0 ? 'lg:col-span-1' : 'lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6'}`}>
+            {/* Right: Info & Links */}
+            <div className={rightColumnClass}>
                  {/* Event Poster Card */}
                  {meta.eventPoster && (
-                     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border dark:border-gray-700 mb-6">
+                     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border dark:border-gray-700">
                          <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-3 text-sm uppercase tracking-wider">Event Poster</h3>
                          <div className="rounded overflow-hidden bg-gray-100">
                             <img src={meta.eventPoster} alt="Event Poster" className="w-full h-auto object-contain cursor-pointer transition hover:scale-105" onClick={()=>window.open(meta.eventPoster, '_blank')} />
                          </div>
                      </div>
+                 )}
+
+                 {announcements.length > 0 && (
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border dark:border-gray-700 flex flex-col h-full">
+                        <div className="flex items-center justify-between mb-3">
+                            <div>
+                                <h3 className="font-bold text-gray-700 dark:text-gray-200 text-sm uppercase tracking-wider">Announcements</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Latest updates from committee</p>
+                            </div>
+                            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-brand-100 text-brand-600">{announcements.length}</span>
+                        </div>
+                        <div className="space-y-4 overflow-y-auto max-h-72 pr-1 custom-scrollbar">
+                            {announcements.map((item: any) => (
+                                <div key={item.id} className="border-l-4 border-brand-500/70 pl-3">
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-white">{item.title}</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-line break-words">{item.message}</p>
+                                    <span className="text-[11px] text-gray-400 dark:text-gray-500 block mt-1">
+                                        {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                  )}
                  
                  {/* Official Resources Links Removed here as per request */}

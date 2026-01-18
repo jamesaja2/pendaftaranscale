@@ -84,6 +84,11 @@ const othersItems: NavItem[] = [
     path: "/announcements",
   },
   {
+    icon: <PageIcon />,
+    name: "Submissions",
+    path: "/submissions",
+  },
+  {
     icon: <ListIcon />,
     name: "Voting Events",
     path: "/voting",

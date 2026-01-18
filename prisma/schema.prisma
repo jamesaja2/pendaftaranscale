@@ -160,6 +160,7 @@ model Team {
   updatedAt       DateTime @updatedAt
   
   votes           Vote[]
+    submissions     Submission[]
 }
 
 model Ingredient {
@@ -189,5 +190,38 @@ model SystemConfig {
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model SubmissionTask {
+  id             String   @id @default(cuid())
+  title          String
+  description    String?
+  instructions   String?  @db.Text
+  allowFile      Boolean  @default(true)
+  allowLink      Boolean  @default(true)
+  acceptMimeTypes String? @db.Text
+  dueDate        DateTime?
+  order          Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  submissions    Submission[]
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  teamId      String
+  taskId      String
+  fileUrl     String?
+  linkUrl     String?
+  submittedAt DateTime @default(now())
+  isLate      Boolean  @default(false)
+  reviewed    Boolean  @default(false)
+  feedback    String?  @db.Text
+
+  team        Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  task        SubmissionTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, taskId])
 }
 
