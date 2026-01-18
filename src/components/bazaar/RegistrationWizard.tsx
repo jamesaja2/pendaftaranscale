@@ -5,7 +5,7 @@ import { checkPaymentStatus } from "@/actions/payment";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import StudentSelect from "@/components/form/StudentSelect";
-import { ChevronDownIcon, SearchIcon, PlusIcon } from '@/icons';
+import { ChevronDownIcon, UserIcon as SearchIcon, PlusIcon } from '@/icons';
 import { useDialog } from "@/context/DialogContext";
 
 export default function RegistrationWizard({ meta, existingTeam }: { meta: any, existingTeam?: any }) {
