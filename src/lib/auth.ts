@@ -1,10 +1,15 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -52,11 +57,61 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "google") {
+        if (!user.email) return false;
+
+        // Upsert user
+        // We will default to role PARTICIAPANT unless logic changes.
+        // The voting page will check for specific domain restrictions, 
+        // allowing all google users to at least login (per requirements).
+        
+        let dbUser = await prisma.user.findUnique({ where: { email: user.email } });
+        
+        if (!dbUser) {
+           dbUser = await prisma.user.create({
+             data: {
+               email: user.email,
+               name: user.name,
+               image: user.image,
+               role: 'PARTICIPANT', // Default role
+               password: null, // No password for OAuth
+             }
+           });
+        }
+        
+        // Pass user info to logic
+        user.id = dbUser.id;
+        (user as any).role = dbUser.role;
+        (user as any).hasTeam = !!dbUser.team; // Prisma include needed if we want this, but for create it's false
+        
+        return true;
+      }
+      return true;
+    },
+    async jwt({ token, user, trigger, session }) {
+      if (trigger === "update" && session) {
+        // Allow client to update session
+        return { ...token, ...session.user };
+      }
+
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
         token.hasTeam = (user as any).hasTeam;
+        
+        // Fetch fresh data for Google Logins to ensure role/team is correct
+        if(!token.role) {
+             const freshUser = await prisma.user.findUnique({ 
+                 where: { email: user.email! },
+                 include: { team: true } 
+             });
+             if(freshUser) {
+                 token.id = freshUser.id;
+                 token.role = freshUser.role;
+                 token.hasTeam = !!freshUser.team;
+             }
+        }
       }
       
       // Auto-refresh team status to handle post-registration updates

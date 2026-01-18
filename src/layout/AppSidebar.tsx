@@ -82,6 +82,11 @@ const othersItems: NavItem[] = [
     icon: <PlugInIcon />,
     name: "Announcements",
     path: "/announcements",
+  },
+  {
+    icon: <ListIcon />,
+    name: "Voting Events",
+    path: "/voting",
   }
 ];
 
@@ -321,14 +326,14 @@ const AppSidebar: React.FC = () => {
             <>
               <Image
                 className="dark:hidden"
-                src="/images/logo/logo.svg"
+                src="/images/logo/logoscale.png"
                 alt="Logo"
                 width={150}
                 height={40}
               />
               <Image
                 className="hidden dark:block"
-                src="/images/logo/logo-dark.svg"
+                src="/images/logo/logoscale.png"
                 alt="Logo"
                 width={150}
                 height={40}
@@ -336,7 +341,7 @@ const AppSidebar: React.FC = () => {
             </>
           ) : (
             <Image
-              src="/images/logo/logo-icon.svg"
+              src="/images/logo/logoscale.png"
               alt="Logo"
               width={32}
               height={32}

@@ -3,12 +3,14 @@ import React, { useState } from "react";
 import { createUser, deleteUser } from "@/actions/user";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
+import { useDialog } from "@/context/DialogContext";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Badge from "@/components/ui/badge/Badge";
 import Image from "next/image";
 
 export default function UserTable({ users }: { users: any[] }) {
+    const { showAlert, showConfirm } = useDialog();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     
@@ -27,14 +29,14 @@ export default function UserTable({ users }: { users: any[] }) {
         if (res.success) {
             setIsModalOpen(false);
             setFormData({ email: "", password: "", role: "ADMIN" });
-            alert("User created successfully");
+            await showAlert("User created successfully", "success");
         } else {
-            alert(res.error || "Failed");
+            await showAlert(res.error || "Failed", "error");
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this user?")) return;
+        if (!(await showConfirm("Are you sure you want to delete this user?", "error"))) return;
         await deleteUser(id);
     };
 

@@ -2,17 +2,39 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { uploadToMinio, getPresignedUrl } from "@/lib/minio";
 
 export async function getGlobalSettings() {
     try {
         const settings = await prisma.globalSettings.findMany();
         // Convert array to object for easier access { key: value }
         const settingsMap: Record<string, string> = {};
-        settings.forEach(s => {
-            settingsMap[s.key] = s.value;
-        });
+        
+        for (const s of settings) {
+             let val = s.value;
+             try {
+                // If it's a JSON array (slider images), parse and sign each
+                if (val.startsWith("[") && val.endsWith("]")) {
+                    const arr = JSON.parse(val);
+                    if (Array.isArray(arr)) {
+                        const signedArr = await Promise.all(arr.map(async (item) => {
+                             if (typeof item === 'string' && !item.startsWith('http') && !item.startsWith('/')) {
+                                 return await getPresignedUrl(item);
+                             }
+                             return item;
+                        }));
+                        val = JSON.stringify(signedArr);
+                    }
+                } else if (!val.startsWith('http') && !val.startsWith('/') && val.includes("content/")) {
+                    // Check if likely a minio key (simple heuristic or checking folder)
+                    val = await getPresignedUrl(val);
+                }
+             } catch (e) {
+                 // ignore parse errors
+             }
+             settingsMap[s.key] = val;
+        }
+
         return { success: true, data: settingsMap };
     } catch (error) {
         console.error("Error fetching settings:", error);
@@ -37,15 +59,14 @@ export async function updateContentSettings(formData: FormData) {
             if (value instanceof File) {
                 if (value.size === 0) continue; // Skip empty files
                 
-                const buffer = Buffer.from(await value.arrayBuffer());
-                const fileName = `${Date.now()}-${value.name.replaceAll(" ", "_")}`;
-                const uploadDir = path.join(process.cwd(), "public/uploads");
-                
-                // Ensure dir exists
-                await mkdir(uploadDir, { recursive: true });
-                
-                await writeFile(path.join(uploadDir, fileName), buffer);
-                const filePath = `/uploads/${fileName}`;
+                let filePath = "";
+                try {
+                     const fileName = `${Date.now()}-${value.name.replaceAll(" ", "_")}`;
+                     filePath = await uploadToMinio(value, fileName, "content");
+                } catch (e) {
+                     console.error("Upload failed", e);
+                     continue;
+                }
 
                 // Logic for slider_images: Append to existing array
                 if (settingKey === "slider_images") {

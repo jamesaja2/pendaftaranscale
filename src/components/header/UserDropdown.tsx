@@ -24,8 +24,8 @@ export default function UserDropdown() {
   const user = dbUser || session?.user;
   const userName = user?.name || user?.email?.split('@')[0] || "User";
   const userEmail = user?.email || "";
-  // Check if image is available, else use fallback
-  const userImage = user?.image || "/images/user/default-user.svg"; 
+  // Check if image is available (db or session), else use fallback
+  const userImage = user?.image || session?.user?.image || "/images/user/default-user.svg"; 
 
   function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
     e.stopPropagation();

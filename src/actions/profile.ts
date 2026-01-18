@@ -5,7 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth"; // Assuming authOptions is exported here, if not need to find it
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
-import { writeFile, mkdir } from "fs/promises";
+import { uploadToMinio, getPresignedUrl } from "@/lib/minio";
 import path from "path";
 
 export async function getUserProfile() {
@@ -21,6 +21,12 @@ export async function getUserProfile() {
     });
 
     if (!user) return { error: "User not found" };
+
+    // Sign user image if exists and not external
+    if (user.image && !user.image.startsWith("http") && !user.image.startsWith("/")) {
+         user.image = await getPresignedUrl(user.image);
+    } 
+
     return { success: true, user };
 }
 
@@ -43,21 +49,11 @@ export async function updateUserProfile(formData: FormData) {
     // Handle Image Upload
     if (imageFile && imageFile.size > 0 && imageFile.name !== "undefined") {
         try {
-            const bytes = await imageFile.arrayBuffer();
-            const buffer = Buffer.from(bytes);
-            
             // Create a unique filename
             const ext = path.extname(imageFile.name) || ".jpg";
-            const filename = `params-${user.id}-${Date.now()}${ext}`;
-            const uploadDir = path.join(process.cwd(), "public/images/user");
+            const filename = `user-${user.id}-${Date.now()}${ext}`;
             
-            // Ensure dir exists
-            await mkdir(uploadDir, { recursive: true });
-            
-            const filePath = path.join(uploadDir, filename);
-            await writeFile(filePath, buffer);
-            
-            imageUrl = `/images/user/${filename}`;
+            imageUrl = await uploadToMinio(imageFile, filename, "users");
         } catch (error) {
             console.error("Image upload failed:", error);
             return { error: "Failed to upload image" };

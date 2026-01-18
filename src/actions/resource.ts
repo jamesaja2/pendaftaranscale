@@ -4,15 +4,27 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 // Max file size 50MB (handled by frontend usually, but good to know)
-import { writeFile } from "fs/promises";
-import { join } from "path";
+import { uploadToMinio, getPresignedUrl } from "@/lib/minio";
 
 export async function getResources() {
   try {
     const resources = await prisma.resource.findMany({
       orderBy: { createdAt: 'desc' }
     });
-    return resources;
+    
+    // Generate presigned URLs for each resource
+    const processedResources = await Promise.all(resources.map(async (r) => {
+        if (r.fileUrl && !r.fileUrl.startsWith('http')) {
+            // It's a MinIO key
+            r.fileUrl = await getPresignedUrl(r.fileUrl);
+        } else if (r.fileUrl && r.fileUrl.includes(process.env.MINIO_ENDPOINT || 'minio')) {
+            // It's a legacy MinIO URL
+            r.fileUrl = await getPresignedUrl(r.fileUrl);
+        }
+        return r;
+    }));
+
+    return processedResources;
   } catch (error) {
     console.error("Error fetching resources:", error);
     return [];
@@ -34,25 +46,16 @@ export async function createResource(formData: FormData) {
     if (link) {
         fileUrl = link;
     } else if (file && file.size > 0) {
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-
-        // Save to public/uploads/resources
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const filename = file.name.replace(/[^a-zA-Z0-9.]/g, "_");
-        const finalFilename = `${uniqueSuffix}-${filename}`;
-        const uploadDir = join(process.cwd(), "public/uploads/resources");
-        
-        // Ensure dir exists
-        const fs = require('fs');
-        if (!fs.existsSync(uploadDir)){
-            fs.mkdirSync(uploadDir, { recursive: true });
+        try {
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+            const filename = file.name.replace(/[^a-zA-Z0-9.]/g, "_");
+            const finalFilename = `${uniqueSuffix}-${filename}`;
+            
+            fileUrl = await uploadToMinio(file, finalFilename, "resources");
+        } catch (error) {
+            console.error(error);
+            return { success: false, error: "Failed to upload file" };
         }
-        
-        const filePath = join(uploadDir, finalFilename);
-        await writeFile(filePath, buffer);
-        
-        fileUrl = `/uploads/resources/${finalFilename}`;
     } else {
         return { success: false, error: "Please provide a file or a link" };
     }

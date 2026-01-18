@@ -3,9 +3,11 @@
 import React, { useEffect, useState } from "react";
 import { getBooths, createBooth, deleteBooth } from "@/actions/booth";
 import Label from "@/components/form/Label";
+import { useDialog } from "@/context/DialogContext";
 import Input from "@/components/form/input/InputField";
 
 export default function BoothsPage() {
+    const { showAlert, showConfirm } = useDialog();
     const [booths, setBooths] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
@@ -40,12 +42,12 @@ export default function BoothsPage() {
             setName("");
             loadBooths();
         } else {
-            alert("Error creating booth");
+            await showAlert("Error creating booth", "error");
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this booth?")) return;
+        if (!(await showConfirm("Delete this booth?", "error"))) return;
         await deleteBooth(id);
         loadBooths();
     }

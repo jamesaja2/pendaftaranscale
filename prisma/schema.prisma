@@ -13,6 +13,7 @@ datasource db {
 enum Role {
   ADMIN
   PARTICIPANT
+  VISITOR
 }
 
 enum Category {
@@ -31,7 +32,7 @@ enum PaymentStatus {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  password  String
+  password  String?
   name      String?
   image     String?
   role      Role     @default(PARTICIPANT)
@@ -39,6 +40,34 @@ model User {
   updatedAt DateTime @updatedAt
 
   team      Team?
+  votes     Vote[]
+}
+
+model VotingEvent {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  votes       Vote[]
+}
+
+model Vote {
+  id        String   @id @default(cuid())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String
+
+  event     VotingEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, userId])
 }
 
 model Notification {
@@ -129,6 +158,8 @@ model Team {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  
+  votes           Vote[]
 }
 
 model Ingredient {

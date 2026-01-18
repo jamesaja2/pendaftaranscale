@@ -64,14 +64,14 @@ export async function createTeamAction(data: z.infer<typeof CreateTeamSchema>) {
             
             // If Name provided but no ID (or ID empty), try to find or create
             if (!resolvedIngredientId && mainIngredientName) {
-                 const existing = await tx.mainIngredient.findFirst({
+                 const existing = await tx.ingredient.findFirst({
                     where: { name: { equals: mainIngredientName, mode: 'insensitive' } }
                  });
                  
                  if (existing) {
                      resolvedIngredientId = existing.id;
                  } else {
-                     const newIng = await tx.mainIngredient.create({
+                     const newIng = await tx.ingredient.create({
                          data: { name: mainIngredientName }
                      });
                      resolvedIngredientId = newIng.id;

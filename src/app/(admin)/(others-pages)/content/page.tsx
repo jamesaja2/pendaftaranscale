@@ -6,8 +6,10 @@ import FileUpload from "@/components/form/FileUpload";
 import MultiFileUpload from "@/components/form/MultiFileUpload";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
+import { useDialog } from "@/context/DialogContext";
 
 export default function ContentPage() {
+    const { showAlert, showConfirm } = useDialog();
     const [settings, setSettings] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -82,7 +84,7 @@ export default function ContentPage() {
     }
 
     const handleDeleteIngredient = async (id: string) => {
-        if(!confirm("Delete ingredient?")) return;
+        if(!(await showConfirm("Delete ingredient?", "error"))) return;
         setSaving(true);
         await deleteIngredient(id);
         await loadIngredients();
@@ -123,7 +125,7 @@ export default function ContentPage() {
         const res = await updateContentSettings(fd);
         setSaving(false);
         if (res.success) {
-            alert("Settings updated successfully!");
+            await showAlert("Settings updated successfully!", "success");
             // Refresh settings
             const newSettings = await getGlobalSettings();
             if (newSettings.data) setSettings(newSettings.data);
@@ -135,12 +137,12 @@ export default function ContentPage() {
             setBoothLayoutFile(null);
             setSliderFiles([]);
         } else {
-            alert("Failed to update settings.");
+            await showAlert("Failed to update settings.", "error");
         }
     };
 
     const handleDeleteSlider = async (path: string) => {
-        if(!confirm("Delete this image?")) return;
+        if(!(await showConfirm("Delete this image?", "error"))) return;
         setSaving(true);
         await deleteSliderImage(path);
         const newSettings = await getGlobalSettings();

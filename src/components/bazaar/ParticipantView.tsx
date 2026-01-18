@@ -8,7 +8,7 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
-export default function ParticipantView({ team, meta }: { team: any, meta: any }) {
+export default function ParticipantView({ team, meta, voteStats }: { team: any, meta: any, voteStats?: any[] }) {
     // If no team, show "Register Now" CTA
     if (!team) {
         return (
@@ -51,6 +51,21 @@ export default function ParticipantView({ team, meta }: { team: any, meta: any }
         <div className="space-y-8 max-w-7xl mx-auto">
              <WelcomeSection team={team} meta={meta} />
              <InformationSection meta={meta} />
+
+             {/* Voting Stats */}
+             {voteStats && voteStats.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {voteStats.map((stat, idx) => (
+                        <div key={idx} className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow border border-gray-100 dark:border-gray-700">
+                             <h4 className="text-gray-500 text-sm uppercase font-semibold mb-2">{stat.title}</h4>
+                             <div className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500">
+                                {stat.count} Votes
+                             </div>
+                        </div>
+                    ))}
+                </div>
+             )}
+             
              <DashboardSection team={team} meta={meta} />
         </div>
     );

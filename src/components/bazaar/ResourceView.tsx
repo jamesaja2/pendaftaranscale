@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { createResource, deleteResource } from "@/actions/resource";
 import { useFormStatus } from 'react-dom';
 import FileUpload from "@/components/form/FileUpload";
+import { useDialog } from "@/context/DialogContext";
 
 export default function ResourceView({ resources, role }: { resources: any[], role: string }) {
     const isAdmin = role === 'ADMIN';
@@ -157,11 +158,12 @@ function AdminUploadForm() {
 }
 
 function DeleteButton({ id }: { id: string }) {
+    const { showConfirm } = useDialog();
     const [loading, setLoading] = useState(false);
     return (
         <button 
             onClick={async () => {
-                if(!confirm("Delete this resource?")) return;
+                if(!(await showConfirm("Delete this resource?", "error"))) return;
                 setLoading(true);
                 await deleteResource(id);
                 setLoading(false);

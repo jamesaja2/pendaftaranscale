@@ -2,9 +2,11 @@
 import React, { useState } from "react";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
+import { useDialog } from "@/context/DialogContext";
 import { createAnnouncement } from "@/actions/notification";
 
 export default function AnnouncementPage() {
+    const { showAlert } = useDialog();
     const [title, setTitle] = useState("");
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(false);
@@ -15,11 +17,11 @@ export default function AnnouncementPage() {
         const res = await createAnnouncement(title, message);
         setLoading(false);
         if (res.success) {
-            alert("Announcement created!");
+            await showAlert("Announcement created!", "success");
             setTitle("");
             setMessage("");
         } else {
-            alert("Error creating announcement");
+            await showAlert("Error creating announcement", "error");
         }
     };
 

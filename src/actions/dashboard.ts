@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { uploadToMinio } from "@/lib/minio";
 
 export async function getDashboardData() {
   const session = await getServerSession(authOptions);
@@ -65,10 +66,23 @@ export async function getDashboardData() {
       if(s.key === 'poster_due_date') dueDates.poster = s.value;
       if(s.key === 'inventory_due_date') dueDates.inventory = s.value;
   });
+  
+  // Voting Stats
+  let voteStats = [];
+  if (user.team) {
+      const events = await prisma.votingEvent.findMany();
+      for (const ev of events) {
+          const count = await prisma.vote.count({
+              where: { eventId: ev.id, teamId: user.team.id }
+          });
+          voteStats.push({ title: ev.title, count });
+      }
+  }
 
   return { 
       role: 'PARTICIPANT', 
       team: user.team,
+      voteStats, // Add here
       meta: { 
           ingredients: ingredientsWithUsage, 
           booths,
@@ -160,27 +174,16 @@ export async function uploadSubmission(teamId: string, type: string, formData: F
     if (link) {
         storedValue = link;
     } else if (file && file.size > 0) {
-        // Handle physical file upload (simulate for now or use real local storage logic from resource)
-         // Save to public/uploads/submissions
-         const { writeFile } = require('fs/promises');
-         const { join } = require('path');
-         
-         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-         const filename = file.name.replace(/[^a-zA-Z0-9.]/g, "_");
-         const finalFilename = `${uniqueSuffix}-${filename}`;
-         const uploadDir = join(process.cwd(), "public/uploads/submissions");
-         
-         const fs = require('fs');
-         if (!fs.existsSync(uploadDir)){
-             fs.mkdirSync(uploadDir, { recursive: true });
+         try {
+             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+             const filename = file.name.replace(/[^a-zA-Z0-9.]/g, "_");
+             const finalFilename = `${uniqueSuffix}-${filename}`;
+             
+             storedValue = await uploadToMinio(file, finalFilename, "submissions");
+         } catch (error) {
+             console.error("Upload error:", error);
+             return { error: "Failed to upload file to storage" };
          }
-         
-         const bytes = await file.arrayBuffer();
-         const buffer = Buffer.from(bytes);
-         const filePath = join(uploadDir, finalFilename);
-         await writeFile(filePath, buffer);
-         
-         storedValue = `/uploads/submissions/${finalFilename}`;
     } else {
         return { error: "No file or link provided" };
     }

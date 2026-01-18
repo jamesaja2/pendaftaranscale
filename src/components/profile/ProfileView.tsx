@@ -1,12 +1,14 @@
 "use client";
 import React, { useState } from "react";
 import { updateUserProfile } from "@/actions/profile";
+import { useDialog } from "@/context/DialogContext";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import FileUpload from "@/components/form/FileUpload";
 import Image from "next/image";
 
 export default function ProfileView({ user }: { user: any }) {
+    const { showAlert } = useDialog();
     const [loading, setLoading] = useState(false);
     
     // Derived state
@@ -48,13 +50,13 @@ export default function ProfileView({ user }: { user: any }) {
         const res = await updateUserProfile(fd);
         setLoading(false);
         if (res.success) {
-            alert("Profile updated successfully");
+            await showAlert("Profile updated successfully", "success");
             setPassword("");
             setConfirmPassword("");
             setImageFile(null);
             window.location.reload(); 
         } else {
-            alert(res.error || "Failed to update profile");
+            await showAlert(res.error || "Failed to update profile", "error");
         }
     };
 

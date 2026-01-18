@@ -5,7 +5,7 @@ import AdminView from "@/components/bazaar/AdminView";
 import ParticipantView from "@/components/bazaar/ParticipantView";
 
 export const metadata: Metadata = {
-  title: "Competition Bazaar Dashboard",
+  title: "SCALE Dashboard | Manage Bazaar Participation",
   description: "Manage your bazaar participation",
 };
 
