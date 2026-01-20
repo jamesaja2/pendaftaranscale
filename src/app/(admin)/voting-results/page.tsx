@@ -22,7 +22,10 @@ export default async function VotingResultsPage() {
     );
   }
 
-  const { team, results } = data;
+  const { team, results = [] } = data;
+  const teamName = team?.name ?? "Tim belum terdaftar";
+  const teamCategory = team?.category || "Kategori belum diatur";
+  const teamBooth = team?.booth ? `• Booth ${team.booth}` : "";
 
   return (
     <div className="space-y-6">
@@ -37,9 +40,9 @@ export default async function VotingResultsPage() {
           </div>
           <div className="bg-brand-50 dark:bg-brand-500/10 border border-brand-100 dark:border-brand-500/30 rounded-xl px-5 py-4 text-right">
             <p className="text-sm text-brand-600 dark:text-brand-200">Tim</p>
-            <h2 className="text-2xl font-bold text-brand-900 dark:text-white">{team.name}</h2>
+            <h2 className="text-2xl font-bold text-brand-900 dark:text-white">{teamName}</h2>
             <p className="text-xs text-brand-500/80 dark:text-brand-200/70">
-              {team.category || "Kategori belum diatur"} {team.booth ? `• Booth ${team.booth}` : ""}
+              {teamCategory} {teamBooth}
             </p>
           </div>
         </div>

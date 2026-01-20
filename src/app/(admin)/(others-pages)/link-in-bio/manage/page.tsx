@@ -21,6 +21,36 @@ export const metadata: Metadata = {
 
 const uploadLabel = formatMaxUploadLabel();
 
+async function handleUpdateProfile(formData: FormData) {
+  "use server";
+  await updateLinkInBioProfile(formData);
+}
+
+async function handleAddSlide(formData: FormData) {
+  "use server";
+  await addLinkInBioSlide(formData);
+}
+
+async function handleDeleteSlide(formData: FormData) {
+  "use server";
+  await deleteLinkInBioSlide(formData);
+}
+
+async function handleCreateLink(formData: FormData) {
+  "use server";
+  await createLinkInBioLink(formData);
+}
+
+async function handleUpdateLink(formData: FormData) {
+  "use server";
+  await updateLinkInBioLink(formData);
+}
+
+async function handleDeleteLink(formData: FormData) {
+  "use server";
+  await deleteLinkInBioLink(formData);
+}
+
 export default async function LinkInBioManagerPage() {
   const data = await getLinkInBioAdminData();
 
@@ -56,7 +86,7 @@ function Section({ title, description, children }: { title: string; description:
 function HeroSettingsForm({ profile }: { profile: LinkInBioProfile }) {
   return (
     <Section title="Hero" description="Customize avatar, accent colors, and copy.">
-      <form action={updateLinkInBioProfile} className="grid gap-6 lg:grid-cols-2">
+      <form action={handleUpdateProfile} className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Title</label>
@@ -166,7 +196,7 @@ function SliderManager({ slides }: { slides: LinkInBioSlide[] }) {
               </div>
               <div className="space-y-2 p-4 text-sm">
                 <p className="truncate font-semibold text-gray-900 dark:text-gray-100">{slide.link || "No link"}</p>
-                <form action={deleteLinkInBioSlide}>
+                <form action={handleDeleteSlide}>
                   <input type="hidden" name="key" value={slide.key} />
                   <button
                     type="submit"
@@ -179,7 +209,7 @@ function SliderManager({ slides }: { slides: LinkInBioSlide[] }) {
             </div>
           ))}
         </div>
-        <form action={addLinkInBioSlide} className="rounded-2xl border border-dashed border-gray-300 p-6 dark:border-gray-700">
+        <form action={handleAddSlide} className="rounded-2xl border border-dashed border-gray-300 p-6 dark:border-gray-700">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Banner Image</label>
@@ -222,7 +252,7 @@ function LinkManager({ links }: { links: LinkInBioLink[] }) {
         <div className="grid gap-4 md:grid-cols-2">
           {links.map((link) => (
             <div key={link.id} className="rounded-2xl border border-gray-200 bg-white/60 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
-              <form action={updateLinkInBioLink} className="space-y-3 text-sm">
+              <form action={handleUpdateLink} className="space-y-3 text-sm">
                 <input type="hidden" name="id" value={link.id} />
                 <div>
                   <label className="text-xs uppercase tracking-wide text-gray-500">Title</label>
@@ -282,7 +312,7 @@ function LinkManager({ links }: { links: LinkInBioLink[] }) {
                   </button>
                 </div>
               </form>
-              <form action={deleteLinkInBioLink} className="mt-3 text-right">
+              <form action={handleDeleteLink} className="mt-3 text-right">
                 <input type="hidden" name="id" value={link.id} />
                 <button type="submit" className="text-xs font-semibold text-red-500 hover:text-red-600">
                   Delete Link
@@ -292,7 +322,7 @@ function LinkManager({ links }: { links: LinkInBioLink[] }) {
           ))}
         </div>
         <div className="rounded-2xl border border-dashed border-gray-300 p-6 dark:border-gray-700">
-          <form action={createLinkInBioLink} className="grid gap-4 md:grid-cols-2">
+          <form action={handleCreateLink} className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Title</label>
               <input

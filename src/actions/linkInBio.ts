@@ -52,6 +52,10 @@ type ProfileRecord = {
   avatarKey?: string;
 };
 
+type LinkInBioAdminResult =
+  | { success: false; error?: string }
+  | { success: true; slides: LinkInBioSlide[]; links: LinkInBioLink[]; profile: LinkInBioProfile };
+
 const DEFAULT_PROFILE_RECORD: ProfileRecord = {
   title: "SCALE Bazaar",
   subtitle: "Discover the tenants and highlights",
@@ -157,7 +161,7 @@ export async function getLinkInBioPublicData() {
   return { slides, links, profile };
 }
 
-export async function getLinkInBioAdminData() {
+export async function getLinkInBioAdminData(): Promise<LinkInBioAdminResult> {
   const session = await getServerSession(authOptions);
   if (!session || (session.user as any)?.role !== "ADMIN") {
     return { success: false, error: "Unauthorized" };
