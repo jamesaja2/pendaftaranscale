@@ -61,7 +61,11 @@ const DEFAULT_PROFILE_RECORD: ProfileRecord = {
 };
 
 const DEFAULT_PROFILE: LinkInBioProfile = {
-  ...DEFAULT_PROFILE_RECORD,
+  title: DEFAULT_PROFILE_RECORD.title || "SCALE Bazaar",
+  subtitle: DEFAULT_PROFILE_RECORD.subtitle || "Discover the tenants and highlights",
+  buttonText: DEFAULT_PROFILE_RECORD.buttonText || "Visit Main Site",
+  footer: DEFAULT_PROFILE_RECORD.footer || "Powered by SCALE",
+  accent: DEFAULT_PROFILE_RECORD.accent || "#f97316",
   avatarUrl: null,
   avatarKey: null,
 };
