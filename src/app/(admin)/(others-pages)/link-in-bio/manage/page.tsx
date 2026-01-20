@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import {
   getLinkInBioAdminData,
   addLinkInBioSlide,
@@ -9,17 +8,14 @@ import {
   deleteLinkInBioLink,
   updateLinkInBioProfile,
   type LinkInBioLink,
-  type LinkInBioProfile,
-  type LinkInBioSlide,
 } from "@/actions/linkInBio";
-import { formatMaxUploadLabel } from "@/lib/uploadLimits";
+import { HeroSettingsForm } from "./HeroSettingsForm";
+import { SliderManager } from "./SliderManager";
 
 export const metadata: Metadata = {
   title: "Link in Bio Manager",
   description: "Configure the mobile link hub",
 };
-
-const uploadLabel = formatMaxUploadLabel();
 
 async function handleUpdateProfile(formData: FormData) {
   "use server";
@@ -64,8 +60,12 @@ export default async function LinkInBioManagerPage() {
 
   return (
     <div className="space-y-10">
-      <HeroSettingsForm profile={data.profile} />
-      <SliderManager slides={data.slides} />
+      <HeroSettingsForm profile={data.profile} onSubmit={handleUpdateProfile} />
+      <SliderManager
+        slides={data.slides}
+        onAddSlide={handleAddSlide}
+        onDeleteSlide={handleDeleteSlide}
+      />
       <LinkManager links={data.links} />
     </div>
   );
@@ -80,168 +80,6 @@ function Section({ title, description, children }: { title: string; description:
       </div>
       {children}
     </section>
-  );
-}
-
-function HeroSettingsForm({ profile }: { profile: LinkInBioProfile }) {
-  return (
-    <Section title="Hero" description="Customize avatar, accent colors, and copy.">
-      <form action={handleUpdateProfile} className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Title</label>
-            <input
-              type="text"
-              name="title"
-              defaultValue={profile.title}
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700"
-              placeholder="SCALE Bazaar 2026"
-              required
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Subtitle</label>
-            <input
-              type="text"
-              name="subtitle"
-              defaultValue={profile.subtitle}
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700"
-              placeholder="Discover every tenant and performance"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Primary Button Text</label>
-            <input
-              type="text"
-              name="buttonText"
-              defaultValue={profile.buttonText}
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700"
-              placeholder="Visit Main Site"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Footer Note</label>
-            <input
-              type="text"
-              name="footer"
-              defaultValue={profile.footer}
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700"
-              placeholder="Powered by SCALE"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Accent Color</label>
-            <input
-              type="text"
-              name="accent"
-              defaultValue={profile.accent}
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700"
-              placeholder="#f97316"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full rounded-2xl bg-brand-600 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-500/30 transition hover:bg-brand-700"
-          >
-            Save Hero Content
-          </button>
-        </div>
-        <div className="space-y-4 rounded-2xl border border-dashed border-gray-300 p-6 text-sm dark:border-gray-700">
-          <div className="flex flex-col items-center gap-4 text-center">
-            {profile.avatarUrl ? (
-              <Image
-                src={profile.avatarUrl}
-                alt="Avatar"
-                width={160}
-                height={160}
-                className="h-40 w-40 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-40 w-40 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-                No Avatar
-              </div>
-            )}
-            <p className="text-gray-500">Recommended: square PNG/JPG.</p>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Upload New Avatar</label>
-            <input
-              type="file"
-              name="avatar"
-              accept="image/*"
-              className="mt-1 w-full rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-brand-600 hover:file:bg-brand-100 dark:border-gray-700"
-            />
-            <p className="mt-1 text-xs text-gray-500">Max {uploadLabel}. Larger files are rejected automatically.</p>
-          </div>
-        </div>
-      </form>
-    </Section>
-  );
-}
-
-function SliderManager({ slides }: { slides: LinkInBioSlide[] }) {
-  return (
-    <Section title="Slider" description="Upload hero banners with outbound links.">
-      <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {slides.length === 0 && (
-            <div className="col-span-full rounded-2xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
-              No slides yet.
-            </div>
-          )}
-          {slides.map((slide) => (
-            <div key={slide.key} className="rounded-2xl border border-gray-200 bg-white/60 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
-              <div className="overflow-hidden rounded-t-2xl border-b border-gray-100 dark:border-gray-800">
-                <img src={slide.url} alt="Slide" className="h-48 w-full object-cover" />
-              </div>
-              <div className="space-y-2 p-4 text-sm">
-                <p className="truncate font-semibold text-gray-900 dark:text-gray-100">{slide.link || "No link"}</p>
-                <form action={handleDeleteSlide}>
-                  <input type="hidden" name="key" value={slide.key} />
-                  <button
-                    type="submit"
-                    className="text-xs font-semibold text-red-500 hover:text-red-600"
-                  >
-                    Remove Slide
-                  </button>
-                </form>
-              </div>
-            </div>
-          ))}
-        </div>
-        <form action={handleAddSlide} className="rounded-2xl border border-dashed border-gray-300 p-6 dark:border-gray-700">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Banner Image</label>
-              <input
-                type="file"
-                name="image"
-                accept="image/*"
-                required
-                className="mt-1 w-full rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-brand-600 hover:file:bg-brand-100 dark:border-gray-700"
-              />
-              <p className="mt-1 text-xs text-gray-500">Max {uploadLabel}. Use 9:16 or 4:5 ratio for best fit.</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Destination Link</label>
-              <input
-                type="url"
-                name="link"
-                placeholder="https://"
-                className="mt-1 w-full rounded-xl border border-gray-200 bg-transparent px-4 py-2.5 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700"
-              />
-              <p className="mt-1 text-xs text-gray-500">Optional. Leave blank for static promo.</p>
-            </div>
-          </div>
-          <button
-            type="submit"
-            className="mt-4 w-full rounded-2xl bg-brand-600 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-500/30 transition hover:bg-brand-700"
-          >
-            Add Slide
-          </button>
-        </form>
-      </div>
-    </Section>
   );
 }
 

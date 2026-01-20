@@ -188,16 +188,18 @@ export async function addLinkInBioSlide(formData: FormData) {
 
   const image = formData.get("image");
   const link = ((formData.get("link") as string) || "").trim();
-
-  if (!(image instanceof File) || image.size === 0) {
-    return { success: false, error: "Image is required" };
-  }
-
-  const ext = image.name?.split(".").pop() || "png";
-  const filename = `${Date.now()}-${randomUUID()}.${ext}`;
+  const uploadedKey = ((formData.get("uploadedKey") as string) || "").trim();
 
   try {
-    const key = await uploadToFileServer(image, filename, "linkinbio");
+    let key = uploadedKey;
+    if (!key) {
+      if (!(image instanceof File) || image.size === 0) {
+        return { success: false, error: "Image is required" };
+      }
+      const ext = image.name?.split(".").pop() || "png";
+      const filename = `${Date.now()}-${randomUUID()}.${ext}`;
+      key = await uploadToFileServer(image, filename, "linkinbio");
+    }
     const sliderRaw = await getSettingValue(SLIDER_SETTING_KEY);
     const current = parseJSONValue<SliderRecord[]>(sliderRaw, []);
     current.push({ key, link });
@@ -327,6 +329,7 @@ export async function updateLinkInBioProfile(formData: FormData) {
   const footer = ((formData.get("footer") as string) || "").trim();
   const accent = ((formData.get("accent") as string) || "").trim();
   const avatar = formData.get("avatar");
+  const uploadedKey = ((formData.get("uploadedKey") as string) || "").trim();
 
   const existing = parseProfile(await getSettingValue(PROFILE_SETTING_KEY));
   const profile: ProfileRecord = {
@@ -338,7 +341,12 @@ export async function updateLinkInBioProfile(formData: FormData) {
     avatarKey: existing.avatarKey || undefined,
   };
 
-  if (avatar instanceof File && avatar.size > 0) {
+  if (uploadedKey) {
+    if (profile.avatarKey) {
+      await deleteFromFileServer(profile.avatarKey);
+    }
+    profile.avatarKey = uploadedKey;
+  } else if (avatar instanceof File && avatar.size > 0) {
     const ext = avatar.name?.split(".").pop() || "png";
     const filename = `${Date.now()}-${randomUUID()}.${ext}`;
     try {

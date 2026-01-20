@@ -1,10 +1,10 @@
 "use client";
 import React, { useState } from 'react';
 import { createResource, deleteResource } from "@/actions/resource";
-import { useFormStatus } from 'react-dom';
 import FileUpload from "@/components/form/FileUpload";
 import { useDialog } from "@/context/DialogContext";
 import { MAX_UPLOAD_MB } from "@/lib/uploadLimits";
+import { useUploadWithProgress } from "@/hooks/useUploadWithProgress";
 
 export default function ResourceView({ resources, role }: { resources: any[], role: string }) {
     const isAdmin = role === 'ADMIN';
@@ -58,6 +58,7 @@ function AdminUploadForm() {
     const [link, setLink] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string|null>(null);
+    const { uploadFile, progress, isUploading, error: uploadError } = useUploadWithProgress();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -79,7 +80,15 @@ function AdminUploadForm() {
                  setLoading(false);
                  return;
             }
-            form.append("file", file);
+            try {
+                const { key } = await uploadFile(file, "resources", file.name);
+                form.append("uploadedKey", key);
+            } catch (err) {
+                console.error(err);
+                setError("Failed to upload file");
+                setLoading(false);
+                return;
+            }
         } else {
              if (!link) {
                 setError("Please enter a link");
@@ -112,7 +121,9 @@ function AdminUploadForm() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {error && <div className="p-3 bg-red-100 text-red-700 rounded text-sm">{error}</div>}
+                    {(error || uploadError) && (
+                        <div className="p-3 bg-red-100 text-red-700 rounded text-sm">{error || uploadError}</div>
+                    )}
                     
                     <div>
                         <label className="block text-sm font-medium mb-1">Title</label>
@@ -149,8 +160,14 @@ function AdminUploadForm() {
                         </div>
                     )}
 
-                    <button type="submit" disabled={loading} className="bg-brand-600 text-white px-4 py-2 rounded hover:bg-brand-700 disabled:opacity-50 font-medium">
-                        {loading ? "Uploading..." : "Add Resource"}
+                    {(isUploading || progress > 0) && mode === 'FILE' && (
+                        <div className="rounded-full bg-gray-100 h-2 w-full overflow-hidden">
+                            <div className="h-2 rounded-full bg-brand-500 transition-all" style={{ width: `${progress}%` }}></div>
+                        </div>
+                    )}
+
+                    <button type="submit" disabled={loading || isUploading} className="bg-brand-600 text-white px-4 py-2 rounded hover:bg-brand-700 disabled:opacity-50 font-medium">
+                        {loading || isUploading ? "Uploading..." : "Add Resource"}
                     </button>
                 </form>
             </div>

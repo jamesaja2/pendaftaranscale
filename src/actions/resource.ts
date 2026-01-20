@@ -35,6 +35,7 @@ export async function createResource(formData: FormData) {
     const title = formData.get("title") as string;
     const file = formData.get("file") as File | null;
     const link = formData.get("link") as string | null;
+    const uploadedKey = (formData.get("uploadedKey") as string) || "";
 
     if (!title) {
       return { success: false, error: "Title is required" };
@@ -44,6 +45,8 @@ export async function createResource(formData: FormData) {
 
     if (link) {
         fileUrl = link;
+    } else if (uploadedKey) {
+        fileUrl = uploadedKey;
     } else if (file && file.size > 0) {
       if (file.size > MAX_UPLOAD_BYTES) {
         return { success: false, error: `File exceeds ${MAX_UPLOAD_MB}MB limit` };
