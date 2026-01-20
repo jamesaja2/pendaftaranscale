@@ -1,3 +1,5 @@
+import { MAX_UPLOAD_BYTES } from "./uploadLimits";
+
 const FILE_SERVER_URL = (process.env.FILE_SERVER_URL || "").replace(/\/$/, "");
 const FILE_SERVER_TOKEN = process.env.FILE_SERVER_TOKEN || "";
 
@@ -40,6 +42,22 @@ function buildUrl(key: string) {
     return `${FILE_SERVER_URL}/files/${safeKey}`;
 }
 
+function getFilePayloadSize(file: File | Buffer): number {
+    if (typeof File !== "undefined" && file instanceof File) {
+        return file.size;
+    }
+    if (typeof Blob !== "undefined" && file instanceof Blob) {
+        return file.size;
+    }
+    if (typeof Buffer !== "undefined" && Buffer.isBuffer(file)) {
+        return file.byteLength;
+    }
+    if (typeof (file as any)?.size === "number") {
+        return (file as any).size;
+    }
+    return 0;
+}
+
 async function toBlob(file: File | Buffer) {
     if (typeof File !== "undefined" && file instanceof File) {
         return file;
@@ -56,6 +74,10 @@ async function toBlob(file: File | Buffer) {
 
 export async function uploadToFileServer(file: File | Buffer, filename: string, folder = "") {
     ensureConfig();
+    const fileSize = getFilePayloadSize(file);
+    if (fileSize > MAX_UPLOAD_BYTES) {
+        throw new Error(`File exceeds the ${Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))}MB limit`);
+    }
     const key = buildKey(filename, folder);
     const formData = new FormData();
     const blob = await toBlob(file);

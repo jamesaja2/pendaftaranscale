@@ -3,8 +3,8 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-// Max file size 50MB (handled by frontend usually, but good to know)
 import { uploadToFileServer, getPublicFileUrl } from "@/lib/fileServer";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from "@/lib/uploadLimits";
 
 export async function getResources() {
   try {
@@ -45,6 +45,9 @@ export async function createResource(formData: FormData) {
     if (link) {
         fileUrl = link;
     } else if (file && file.size > 0) {
+      if (file.size > MAX_UPLOAD_BYTES) {
+        return { success: false, error: `File exceeds ${MAX_UPLOAD_MB}MB limit` };
+      }
         try {
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
             const filename = file.name.replace(/[^a-zA-Z0-9.]/g, "_");

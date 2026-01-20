@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, use } from 'react';
 import { getActiveVotingEvent, castVote } from "@/actions/voting";
-import { useSession, signIn } from "next-auth/react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import Button from "@/components/ui/button/Button";
 import Link from "next/link";
 import Image from "next/image";
@@ -17,6 +17,7 @@ export default function VotePage({ params }: { params: Promise<{ id: string }> }
     const [loading, setLoading] = useState(true);
     const [voting, setVoting] = useState(false);
     const [error, setError] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
         loadData();
@@ -92,6 +93,11 @@ export default function VotePage({ params }: { params: Promise<{ id: string }> }
         )
     }
 
+    const filteredTeams = teams.filter((team) => {
+        if (!searchTerm.trim()) return true;
+        return (team.name || "").toLowerCase().includes(searchTerm.toLowerCase());
+    });
+
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto">
@@ -100,24 +106,53 @@ export default function VotePage({ params }: { params: Promise<{ id: string }> }
                      <p className="text-lg text-gray-600 dark:text-gray-400">{event.description}</p>
                      <p className="mt-2 text-sm text-blue-500">Logged in as {email}</p>
                 </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {teams.map((team) => (
-                        <div key={team.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-shadow overflow-hidden border border-gray-100 dark:border-gray-700">
-                             <div className="p-6">
-                                 <h3 className="text-xl font-bold mb-2 dark:text-white">{team.name || "Unnamed Team"}</h3>
-                                 <p className="text-sm text-gray-500 mb-4">{team.category} - {team.boothLocation?.name}</p>
-                                 <Button 
-                                    className="w-full justify-center" 
-                                    onClick={() => handleVote(team.id, team.name)}
-                                    disabled={voting}
-                                 >
-                                    Vote
-                                 </Button>
-                             </div>
-                        </div>
-                    ))}
+
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-10">
+                    <div className="w-full md:max-w-md">
+                        <label htmlFor="tenant-search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Cari Tenant
+                        </label>
+                        <input
+                            id="tenant-search"
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Cari nama tenant atau tim..."
+                            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                    </div>
+                    <Button
+                        variant="outline"
+                        className="w-full md:w-auto text-red-600 dark:text-red-400"
+                        onClick={() => signOut({ callbackUrl: "/" })}
+                    >
+                        Logout
+                    </Button>
                 </div>
+                
+                {filteredTeams.length === 0 ? (
+                    <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-8 text-center text-gray-500 dark:text-gray-300">
+                        Tidak ada tenant yang cocok dengan pencarian.
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {filteredTeams.map((team) => (
+                            <div key={team.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-shadow overflow-hidden border border-gray-100 dark:border-gray-700">
+                                 <div className="p-6">
+                                     <h3 className="text-xl font-bold mb-2 dark:text-white">{team.name || "Unnamed Team"}</h3>
+                                     <p className="text-sm text-gray-500 mb-4">{team.category} - {team.boothLocation?.name}</p>
+                                     <Button 
+                                        className="w-full justify-center" 
+                                        onClick={() => handleVote(team.id, team.name)}
+                                        disabled={voting}
+                                     >
+                                        Vote
+                                     </Button>
+                                 </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

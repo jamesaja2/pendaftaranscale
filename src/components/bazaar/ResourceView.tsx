@@ -4,6 +4,7 @@ import { createResource, deleteResource } from "@/actions/resource";
 import { useFormStatus } from 'react-dom';
 import FileUpload from "@/components/form/FileUpload";
 import { useDialog } from "@/context/DialogContext";
+import { MAX_UPLOAD_MB } from "@/lib/uploadLimits";
 
 export default function ResourceView({ resources, role }: { resources: any[], role: string }) {
     const isAdmin = role === 'ADMIN';
@@ -72,9 +73,9 @@ function AdminUploadForm() {
                 setLoading(false);
                 return;
             }
-            // Admin no limit or large limit. Let's do 100MB check just in case.
-            if (file.size > 100 * 1024 * 1024) { 
-                 setError("File is too large (Max 100MB)");
+              const maxBytes = MAX_UPLOAD_MB * 1024 * 1024;
+              if (file.size > maxBytes) { 
+                  setError(`File is too large (Max ${MAX_UPLOAD_MB}MB)`);
                  setLoading(false);
                  return;
             }

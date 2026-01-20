@@ -40,8 +40,14 @@ const participantItems: NavItem[] = [
     icon: <PageIcon />, // Using PageIcon for general tasks/submissions
     name: "Submissions",
     path: "/submissions",
-  }
+  },
 ];
+
+const participantVotingItem: NavItem = {
+  icon: <PieChartIcon />,
+  name: "Voting Results",
+  path: "/voting-results",
+};
 
 const resourceItems: NavItem[] = [
   {
@@ -89,6 +95,11 @@ const othersItems: NavItem[] = [
     path: "/submissions",
   },
   {
+    icon: <PageIcon />,
+    name: "Link in Bio",
+    path: "/link-in-bio/manage",
+  },
+  {
     icon: <ListIcon />,
     name: "Voting Events",
     path: "/voting",
@@ -101,7 +112,9 @@ const AppSidebar: React.FC = () => {
   const { data: session } = useSession();
   const userRole = (session?.user as any)?.role;
   const hasTeam = (session?.user as any)?.hasTeam;
+  const hasPaidTeam = (session?.user as any)?.hasPaidTeam;
   const isParticipant = userRole !== 'ADMIN';
+  const participantMenuItems = hasPaidTeam ? [...participantItems, participantVotingItem] : participantItems;
 
   // FIX: If hasTeam is true (meaning created), BUT payment is incomplete, 
   // we might still want to show "Registration" or "Payment" instead of hiding it.
@@ -375,7 +388,7 @@ const AppSidebar: React.FC = () => {
               
               {isParticipant && (
                  <div className="mt-4">
-                  {hasTeam ? renderMenuItems(participantItems, "main") : renderMenuItems([registerItem], "main")}
+                  {hasTeam ? renderMenuItems(participantMenuItems, "main") : renderMenuItems([registerItem], "main")}
                   {/* Resources visible to all participants regardless of team/payment status */}
                   <div className="mt-4">
                      {renderMenuItems(resourceItems, "main")}

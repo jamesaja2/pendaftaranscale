@@ -50,13 +50,16 @@ export const authOptions: NextAuthOptions = {
         console.log(`Login Success: ${credentials.email}`);
 
         // Check if user has a team (handle array or single object)
-        const hasTeam = Array.isArray(user.team) ? user.team.length > 0 : !!user.team;
+        const maybeTeam = Array.isArray(user.team) ? user.team[0] : user.team;
+        const hasTeam = !!maybeTeam;
+        const hasPaidTeam = !!maybeTeam && (maybeTeam.paymentStatus === 'PAID' || maybeTeam.paymentStatus === 'VERIFIED');
 
         return {
           id: user.id,
           email: user.email,
           role: user.role,
-          hasTeam: hasTeam
+          hasTeam,
+          hasPaidTeam
         };
       },
     }),
@@ -92,8 +95,11 @@ export const authOptions: NextAuthOptions = {
         // Pass user info to logic
         user.id = dbUser.id;
         (user as any).role = dbUser.role;
-        const hasTeam = Array.isArray(dbUser.team) ? dbUser.team.length > 0 : !!dbUser.team;
-        (user as any).hasTeam = hasTeam; // Prisma include needed if we want this, but for create it's false
+        const maybeTeam = Array.isArray(dbUser.team) ? dbUser.team[0] : dbUser.team;
+        const hasTeam = !!maybeTeam;
+        const hasPaidTeam = !!maybeTeam && (maybeTeam.paymentStatus === 'PAID' || maybeTeam.paymentStatus === 'VERIFIED');
+        (user as any).hasTeam = hasTeam;
+        (user as any).hasPaidTeam = hasPaidTeam;
         
         return true;
       }
@@ -109,17 +115,20 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.role = (user as any).role;
         token.hasTeam = (user as any).hasTeam;
+        token.hasPaidTeam = (user as any).hasPaidTeam;
         
         // Fetch fresh data for Google Logins to ensure role/team is correct
         if(!token.role) {
              const freshUser = await prisma.user.findUnique({ 
-                 where: { email: user.email! },
-                 include: { team: true } 
+             where: { email: user.email! },
+             include: { team: true } 
              });
              if(freshUser) {
                  token.id = freshUser.id;
                  token.role = freshUser.role;
-                 token.hasTeam = !!freshUser.team;
+             token.hasTeam = !!freshUser.team;
+             const freshTeam = Array.isArray(freshUser.team) ? freshUser.team[0] : freshUser.team;
+             token.hasPaidTeam = !!freshTeam && (freshTeam.paymentStatus === 'PAID' || freshTeam.paymentStatus === 'VERIFIED');
              }
         }
       }
@@ -128,12 +137,14 @@ export const authOptions: NextAuthOptions = {
       if (!user && token.email) {
           try {
             const dbUser = await prisma.user.findUnique({
-                where: { email: token.email },
-                select: { team: true } 
+            where: { email: token.email },
+            select: { team: true } 
             });
             if (dbUser) {
-               const hasTeam = Array.isArray(dbUser.team) ? dbUser.team.length > 0 : !!dbUser.team;
-               token.hasTeam = hasTeam;
+             const maybeTeam = Array.isArray(dbUser.team) ? dbUser.team[0] : dbUser.team;
+             const hasTeam = !!maybeTeam;
+             token.hasTeam = hasTeam;
+             token.hasPaidTeam = !!maybeTeam && (maybeTeam.paymentStatus === 'PAID' || maybeTeam.paymentStatus === 'VERIFIED');
             }
           } catch (error) {
               console.error("Error refreshing team status in JWT", error);
@@ -147,6 +158,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
         (session.user as any).hasTeam = token.hasTeam;
+        (session.user as any).hasPaidTeam = token.hasPaidTeam;
       }
       return session;
     },
