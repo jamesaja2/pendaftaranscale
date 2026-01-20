@@ -33,6 +33,10 @@ function buildKey(filename: string, folder?: string) {
     return `${cleanFolder}--${cleanName}`;
 }
 
+export function buildUploadKey(filename: string, folder?: string) {
+    return buildKey(filename, folder);
+}
+
 function buildUrl(key: string) {
     const safeKey = key
         .split("/")
@@ -40,6 +44,32 @@ function buildUrl(key: string) {
         .map((segment) => encodeURIComponent(segment))
         .join("/");
     return `${FILE_SERVER_URL}/files/${safeKey}`;
+}
+
+export function buildUploadUrl(key: string) {
+    ensureConfig();
+    const safeKey = key
+        .split("/")
+        .filter(Boolean)
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
+    return `${FILE_SERVER_URL}/files/${safeKey}`;
+}
+
+export function getFileServerBaseUrl() {
+    ensureConfig();
+    return FILE_SERVER_URL;
+}
+
+export function getFileServerAuthToken() {
+    ensureConfig();
+    return FILE_SERVER_TOKEN;
+}
+
+export function getFileServerUploadHeaders() {
+    return {
+        Authorization: `Bearer ${getFileServerAuthToken()}`,
+    } as const;
 }
 
 function getFilePayloadSize(file: File | Buffer): number {
@@ -78,12 +108,12 @@ export async function uploadToFileServer(file: File | Buffer, filename: string, 
     if (fileSize > MAX_UPLOAD_BYTES) {
         throw new Error(`File exceeds the ${Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))}MB limit`);
     }
-    const key = buildKey(filename, folder);
+    const key = buildUploadKey(filename, folder);
     const formData = new FormData();
     const blob = await toBlob(file);
     formData.append("file", blob, key.split("/").pop());
 
-    const response = await fetch(buildUrlForUpload(key), {
+    const response = await fetch(buildUploadUrl(key), {
         method: "PUT",
         headers: {
             Authorization: `Bearer ${FILE_SERVER_TOKEN}`,
@@ -104,19 +134,10 @@ export async function uploadToFileServer(file: File | Buffer, filename: string, 
     return key;
 }
 
-function buildUrlForUpload(key: string) {
-    const safeKey = key
-        .split("/")
-        .filter(Boolean)
-        .map((segment) => encodeURIComponent(segment))
-        .join("/");
-    return `${FILE_SERVER_URL}/files/${safeKey}`;
-}
-
 export async function deleteFromFileServer(key: string) {
     ensureConfig();
     if (!key) return;
-    const response = await fetch(buildUrlForUpload(key), {
+    const response = await fetch(buildUploadUrl(key), {
         method: "DELETE",
         headers: {
             Authorization: `Bearer ${FILE_SERVER_TOKEN}`,
