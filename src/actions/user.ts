@@ -15,7 +15,14 @@ export async function getUsers() {
                 createdAt: true,
             }
         });
-        return { success: true, data: users };
+        // Ensure data is properly serialized for client-side rendering
+        const serialized = users.map(u => ({
+            id: String(u.id),
+            email: String(u.email),
+            role: String(u.role),
+            createdAt: new Date(u.createdAt).toISOString(),
+        }));
+        return { success: true, data: serialized };
     } catch (error) {
         console.error("Error fetching users:", error);
         return { success: false, error: "Failed to fetch users" };

@@ -14,6 +14,9 @@ export default function UserTable({ users }: { users: any[] }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     
+    // Validate and normalize users array
+    const safeUsers = Array.isArray(users) ? users.filter(u => u && u.id && u.email) : [];
+    
     // Form State
     const [formData, setFormData] = useState({
         email: "",
@@ -76,19 +79,19 @@ export default function UserTable({ users }: { users: any[] }) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                                {users.map((user) => (
+                                {safeUsers.map((user) => (
                                     <TableRow key={user.id}>
                                         <TableCell className="px-5 py-4 sm:px-6 text-start">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500">
-                                                    {user.email.charAt(0).toUpperCase()}
+                                                    {String(user.email).charAt(0).toUpperCase()}
                                                 </div>
                                                 <div>
                                                     <span className="block font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                                                        {user.email}
+                                                        {String(user.email)}
                                                     </span>
                                                     <span className="block text-gray-500 text-theme-xs dark:text-gray-400">
-                                                        ID: {user.id.slice(-6)}
+                                                        ID: {String(user.id).slice(-6)}
                                                     </span>
                                                 </div>
                                             </div>
@@ -96,13 +99,13 @@ export default function UserTable({ users }: { users: any[] }) {
                                         <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">
                                             <Badge
                                                 size="sm"
-                                                color={user.role === 'ADMIN' ? 'success' : 'warning'}
+                                                color={(String(user.role) === 'ADMIN' ? 'success' : 'warning') as any}
                                             >
-                                                {user.role}
+                                                {String(user.role) || 'UNKNOWN'}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                                            {new Date(user.createdAt).toLocaleDateString()}
+                                            {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-gray-500 text-theme-sm dark:text-gray-400">
                                             <button 

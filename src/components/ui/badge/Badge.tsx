@@ -63,14 +63,17 @@ const Badge: React.FC<BadgeProps> = ({
     },
   };
 
-  // Get styles based on size and color variant
-  const sizeClass = sizeStyles[size];
-  const colorStyles = variants[variant][color];
+  // Get styles based on size and color variant (with fallback to primary if invalid color)
+  const sizeClass = sizeStyles[size] || sizeStyles.md;
+  const colorStyles = (variants[variant] as any)?.[color] || (variants[variant] as any).primary;
+
+  // Ensure children is renderable
+  const safeChildren = children == null ? "" : children;
 
   return (
     <span className={`${baseStyles} ${sizeClass} ${colorStyles}`}>
       {startIcon && <span className="mr-1">{startIcon}</span>}
-      {children}
+      {safeChildren}
       {endIcon && <span className="ml-1">{endIcon}</span>}
     </span>
   );
