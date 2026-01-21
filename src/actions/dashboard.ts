@@ -257,7 +257,9 @@ export async function getDashboardData() {
                   'manual_payment_bank_name',
                   'manual_payment_account_number',
                   'manual_payment_account_name',
-                  'manual_payment_note'
+                  'manual_payment_note',
+                  'payment_method_qris_enabled',
+                  'payment_method_manual_enabled'
               ]
           }
       } 
@@ -277,12 +279,16 @@ export async function getDashboardData() {
   const registrationCloseMessage = settingsMap['registration_close_message'] || '';
     const registrationFeeSetting = settingsMap['registration_fee'];
     const registrationFee = registrationFeeSetting ? parseInt(registrationFeeSetting, 10) || 0 : 0;
-    const manualPayment = {
-            bankName: settingsMap['manual_payment_bank_name'] || "",
-            accountNumber: settingsMap['manual_payment_account_number'] || "",
-            accountName: settingsMap['manual_payment_account_name'] || "",
-            instructions: settingsMap['manual_payment_note'] || "",
-    };
+      const manualPayment = {
+          bankName: settingsMap['manual_payment_bank_name'] || "",
+          accountNumber: settingsMap['manual_payment_account_number'] || "",
+          accountName: settingsMap['manual_payment_account_name'] || "",
+          instructions: settingsMap['manual_payment_note'] || "",
+      };
+      const paymentOptions = {
+          qrisEnabled: settingsMap['payment_method_qris_enabled'] !== 'false',
+          manualEnabled: settingsMap['payment_method_manual_enabled'] === 'true' || settingsMap['payment_method_manual_enabled'] === undefined,
+      };
 
   const announcementsRaw = await prisma.notification.findMany({
       orderBy: { createdAt: 'desc' },
@@ -309,12 +315,12 @@ export async function getDashboardData() {
 
   const submissionTasks = await getParticipantSubmissionTasks(user.team?.id);
 
-  const participantTeam = user.team
-      ? {
-            ...user.team,
-            manualPaymentProofUrl: user.team.manualPaymentProof ? getPublicFileUrl(user.team.manualPaymentProof) : null,
-        }
-      : null;
+    const participantTeam = user.team
+            ? {
+                        ...user.team,
+                        manualPaymentProofUrl: user.team.manualPaymentProof ? getPublicFileUrl(user.team.manualPaymentProof) : null,
+                }
+            : null;
 
   return { 
       role: 'PARTICIPANT', 
@@ -339,6 +345,7 @@ export async function getDashboardData() {
                                         registrationFee,
                                         announcements,
                                         manualPayment,
+                                        paymentOptions,
       }
   };
 }

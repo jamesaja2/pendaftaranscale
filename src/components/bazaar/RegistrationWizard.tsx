@@ -417,7 +417,36 @@ type PaymentMethodOption = 'QRIS' | 'MANUAL_TRANSFER';
 function PaymentSection({ team, meta }: { team: any, meta: any }) {
     const { showAlert, showConfirm } = useDialog();
     const paymentMethodFromServer: PaymentMethodOption = team.paymentMethod || 'QRIS';
-    const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>(paymentMethodFromServer);
+    const paymentOptionsFlags = meta?.paymentOptions || { qrisEnabled: true, manualEnabled: true };
+    const methodDefinitions: Array<{
+        key: PaymentMethodOption;
+        title: string;
+        desc: string;
+        icon: string;
+        enabled: boolean;
+    }> = [
+        {
+            key: 'QRIS',
+            title: 'QRIS / Virtual Account',
+            desc: 'Instant confirmation via YoGateway',
+            icon: '⚡',
+            enabled: !!paymentOptionsFlags.qrisEnabled,
+        },
+        {
+            key: 'MANUAL_TRANSFER',
+            title: 'Manual Bank Transfer',
+            desc: 'Upload proof & wait for admin verification',
+            icon: '🏦',
+            enabled: !!paymentOptionsFlags.manualEnabled,
+        },
+    ];
+    const availableMethodKeys: PaymentMethodOption[] = methodDefinitions
+        .filter((method) => method.enabled || paymentMethodFromServer === method.key)
+        .map((method) => method.key);
+    const initialMethod: PaymentMethodOption = availableMethodKeys.includes(paymentMethodFromServer)
+        ? paymentMethodFromServer
+        : availableMethodKeys[0] || 'QRIS';
+    const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>(initialMethod);
     const [timeLeft, setTimeLeft] = useState("");
     const [expired, setExpired] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -483,6 +512,10 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
 
     const handleMethodSelect = async (method: PaymentMethodOption) => {
         if (method === selectedMethod) return;
+        if (!availableMethodKeys.includes(method)) {
+            await showAlert('Payment method not available. Please contact admin.', 'warning');
+            return;
+        }
         setSwitchingMethod(true);
         const res = await updatePaymentMethod(method);
         setSwitchingMethod(false);
@@ -553,6 +586,18 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
         );
     }
 
+    if (availableMethodKeys.length === 0) {
+        return (
+            <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-xl shadow text-center">
+                <h2 className="text-2xl font-bold mb-2">Payment Unavailable</h2>
+                <p className="text-gray-500">No payment methods are currently enabled. Please contact the committee.</p>
+                <button onClick={handleCancel} className="mt-6 text-sm text-brand-600 underline">
+                    Cancel Registration
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className="max-w-3xl mx-auto mt-10">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-6 md:p-8">
@@ -565,14 +610,13 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                    {[
-                        { key: 'QRIS', title: 'QRIS / Virtual Account', desc: 'Instant confirmation via YoGateway', icon: '⚡' },
-                        { key: 'MANUAL_TRANSFER', title: 'Manual Bank Transfer', desc: 'Upload proof & wait for admin verification', icon: '🏦' },
-                    ].map((option) => (
+                    {methodDefinitions
+                        .filter((option) => option.enabled || paymentMethodFromServer === option.key)
+                        .map((option) => (
                         <button
                             key={option.key}
                             type="button"
-                            disabled={switchingMethod}
+                            disabled={switchingMethod || !option.enabled}
                             onClick={() => handleMethodSelect(option.key as PaymentMethodOption)}
                             className={`p-4 rounded-xl border text-left transition ${
                                 selectedMethod === option.key
@@ -582,8 +626,13 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
                         >
                             <div className="flex items-center gap-3">
                                 <span className="text-2xl">{option.icon}</span>
-                                <div>
-                                    <p className="font-semibold text-gray-800 dark:text-white">{option.title}</p>
+                                    {!option.enabled && paymentMethodFromServer === option.key && (
+                                        <p className="text-xs text-red-500 mt-1">
+                                            Disabled by admin. Please switch payment method.
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
                                     <p className="text-sm text-gray-500">{option.desc}</p>
                                 </div>
                             </div>
