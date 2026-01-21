@@ -613,31 +613,31 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
                     {methodDefinitions
                         .filter((option) => option.enabled || paymentMethodFromServer === option.key)
                         .map((option) => (
-                        <button
-                            key={option.key}
-                            type="button"
-                            disabled={switchingMethod || !option.enabled}
-                            onClick={() => handleMethodSelect(option.key as PaymentMethodOption)}
-                            className={`p-4 rounded-xl border text-left transition ${
-                                selectedMethod === option.key
-                                    ? 'border-brand-500 bg-brand-50'
-                                    : 'border-gray-200 hover:border-brand-200'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="text-2xl">{option.icon}</span>
-                                    {!option.enabled && paymentMethodFromServer === option.key && (
-                                        <p className="text-xs text-red-500 mt-1">
-                                            Disabled by admin. Please switch payment method.
-                                        </p>
-                                    )}
+                            <button
+                                key={option.key}
+                                type="button"
+                                disabled={switchingMethod || !option.enabled}
+                                onClick={() => handleMethodSelect(option.key as PaymentMethodOption)}
+                                className={`p-4 rounded-xl border text-left transition ${
+                                    selectedMethod === option.key
+                                        ? 'border-brand-500 bg-brand-50'
+                                        : 'border-gray-200 hover:border-brand-200'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <span className="text-2xl">{option.icon}</span>
+                                    <div>
+                                        <p className="font-semibold text-gray-800 dark:text-white">{option.title}</p>
+                                        <p className="text-sm text-gray-500">{option.desc}</p>
+                                    </div>
                                 </div>
-                            ))}
-                                    <p className="text-sm text-gray-500">{option.desc}</p>
-                                </div>
-                            </div>
-                        </button>
-                    ))}
+                                {!option.enabled && paymentMethodFromServer === option.key && (
+                                    <p className="text-xs text-red-500 mt-2">
+                                        Disabled by admin. Please switch payment method.
+                                    </p>
+                                )}
+                            </button>
+                        ))}
                 </div>
 
                 {selectedMethod === 'QRIS' && (
