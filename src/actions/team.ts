@@ -170,6 +170,7 @@ export async function createTeamAction(data: z.infer<typeof CreateTeamSchema>) {
                 boothLocationId,
                 userId: user.id,
                 paymentStatus: 'PENDING',
+                paymentMethod: 'QRIS',
                 paymentDeadline: deadline,
                 paymentTrxId: paymentTrxId,
                 paymentUrl: paymentUrl // We need to add this to schema OR Use existing optional field

@@ -29,6 +29,11 @@ enum PaymentStatus {
   EXPIRED
 }
 
+enum PaymentMethod {
+  QRIS
+  MANUAL_TRANSFER
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -128,10 +133,15 @@ model Team {
 
   // Payment
   paymentStatus   PaymentStatus @default(PENDING)
+  paymentMethod   PaymentMethod @default(QRIS)
   paymentTrxId    String?       @unique // YoGateway REF ID
   paymentUrl      String?       // Deprecated if using embedded QR, but good to keep
   paidAt          DateTime?
   paymentDeadline DateTime?
+  manualPaymentAmount Int?
+  manualPaymentNote   String?    @db.Text
+  manualPaymentProof  String?
+  manualPaymentSubmittedAt DateTime?
   
   // Terms
   acceptedTerms   Boolean       @default(false)

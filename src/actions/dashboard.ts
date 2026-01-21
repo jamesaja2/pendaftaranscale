@@ -190,7 +190,13 @@ export async function getDashboardData() {
           prisma.globalSettings.findMany(),
           getAdminSubmissionTasks(),
       ]);
-      return { role: 'ADMIN', teams: allTeams, settings, submissionTasks };
+
+      const teamsWithAssets = allTeams.map((team: any) => ({
+          ...team,
+          manualPaymentProofUrl: team.manualPaymentProof ? getPublicFileUrl(team.manualPaymentProof) : null,
+      }));
+
+      return { role: 'ADMIN', teams: teamsWithAssets, settings, submissionTasks };
   }
 
   // Improved Participant Return
@@ -247,7 +253,11 @@ export async function getDashboardData() {
                   'max_team_members',
                   'registration_open',
                   'registration_fee',
-                  'registration_close_message'
+                  'registration_close_message',
+                  'manual_payment_bank_name',
+                  'manual_payment_account_number',
+                  'manual_payment_account_name',
+                  'manual_payment_note'
               ]
           }
       } 
@@ -265,8 +275,14 @@ export async function getDashboardData() {
   const registrationOpenSetting = settingsMap['registration_open'];
   const registrationOpen = registrationOpenSetting !== 'false';
   const registrationCloseMessage = settingsMap['registration_close_message'] || '';
-  const registrationFeeSetting = settingsMap['registration_fee'];
-  const registrationFee = registrationFeeSetting ? parseInt(registrationFeeSetting, 10) || 0 : 0;
+    const registrationFeeSetting = settingsMap['registration_fee'];
+    const registrationFee = registrationFeeSetting ? parseInt(registrationFeeSetting, 10) || 0 : 0;
+    const manualPayment = {
+            bankName: settingsMap['manual_payment_bank_name'] || "",
+            accountNumber: settingsMap['manual_payment_account_number'] || "",
+            accountName: settingsMap['manual_payment_account_name'] || "",
+            instructions: settingsMap['manual_payment_note'] || "",
+    };
 
   const announcementsRaw = await prisma.notification.findMany({
       orderBy: { createdAt: 'desc' },
@@ -293,9 +309,16 @@ export async function getDashboardData() {
 
   const submissionTasks = await getParticipantSubmissionTasks(user.team?.id);
 
+  const participantTeam = user.team
+      ? {
+            ...user.team,
+            manualPaymentProofUrl: user.team.manualPaymentProof ? getPublicFileUrl(user.team.manualPaymentProof) : null,
+        }
+      : null;
+
   return { 
       role: 'PARTICIPANT', 
-      team: user.team,
+      team: participantTeam,
       voteStats, // Add here
       meta: { 
           ingredients: ingredientsWithUsage, 
@@ -314,7 +337,8 @@ export async function getDashboardData() {
                     registrationOpen,
                     registrationCloseMessage,
                                         registrationFee,
-                                        announcements
+                                        announcements,
+                                        manualPayment,
       }
   };
 }
@@ -325,7 +349,7 @@ export async function verifyTeam(teamId: string) {
 
     await prisma.team.update({
         where: { id: teamId },
-        data: { paymentStatus: 'VERIFIED', verifiedAt: new Date() }
+        data: { paymentStatus: 'VERIFIED', verifiedAt: new Date(), paidAt: new Date() }
     });
     revalidatePath("/dashboard");
     return { success: true };

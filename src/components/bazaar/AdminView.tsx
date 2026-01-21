@@ -2,6 +2,11 @@
 import React, { useState } from "react";
 import { verifyTeam, setPosCredentials, updateGlobalSettings } from "@/actions/dashboard";
 
+const formatCurrencyIdr = (value?: number | null) => {
+    if (!value || Number.isNaN(value)) return "-";
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value);
+};
+
 export default function AdminView({ teams, settings }: { teams: any[], settings: any[] }) {
     const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
     const [viewTeam, setViewTeam] = useState<any | null>(null);
@@ -169,6 +174,28 @@ export default function AdminView({ teams, settings }: { teams: any[], settings:
                             </div>
                         </div>
 
+                        <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded border">
+                            <h3 className="font-semibold mb-3 text-gray-700 dark:text-gray-300">Manual Transfer Settings</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Bank Name</label>
+                                    <input type="text" name="setting_manual_payment_bank_name" defaultValue={getSetting('manual_payment_bank_name')} className="w-full p-2 border rounded" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Account Number</label>
+                                    <input type="text" name="setting_manual_payment_account_number" defaultValue={getSetting('manual_payment_account_number')} className="w-full p-2 border rounded" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Account Name</label>
+                                    <input type="text" name="setting_manual_payment_account_name" defaultValue={getSetting('manual_payment_account_name')} className="w-full p-2 border rounded" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <label className="block text-sm font-medium mb-1">Instructions / Notes</label>
+                                <textarea name="setting_manual_payment_note" defaultValue={getSetting('manual_payment_note')} className="w-full p-2 border rounded" rows={3} placeholder="Transfer instructions shown to participants" />
+                            </div>
+                        </div>
+
                         <button type="submit" className="px-6 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded shadow font-medium">
                             Save Changes
                         </button>
@@ -274,6 +301,33 @@ export default function AdminView({ teams, settings }: { teams: any[], settings:
                                      </div>
                                  </div>
                              </div>
+
+                             {(viewTeam.paymentMethod === 'MANUAL_TRANSFER' || viewTeam.manualPaymentProofUrl) && (
+                                <div className="border-t pt-4 space-y-2">
+                                    <h4 className="font-bold text-sm">Manual Transfer Details</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <span className="text-gray-500 uppercase text-xs">Amount</span>
+                                            <p className="font-semibold">{formatCurrencyIdr(viewTeam.manualPaymentAmount)}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-500 uppercase text-xs">Submitted At</span>
+                                            <p className="font-semibold">{viewTeam.manualPaymentSubmittedAt ? new Date(viewTeam.manualPaymentSubmittedAt).toLocaleString() : '-'}</p>
+                                        </div>
+                                    </div>
+                                    {viewTeam.manualPaymentNote && (
+                                        <div>
+                                            <span className="text-gray-500 uppercase text-xs">Note</span>
+                                            <p className="text-sm">{viewTeam.manualPaymentNote}</p>
+                                        </div>
+                                    )}
+                                    {viewTeam.manualPaymentProofUrl && (
+                                        <a href={viewTeam.manualPaymentProofUrl} target="_blank" className="inline-flex items-center gap-2 text-brand-600 text-sm">
+                                            View Proof
+                                        </a>
+                                    )}
+                                </div>
+                             )}
                         </div>
                     </div>
                 </div>

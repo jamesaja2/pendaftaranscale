@@ -1,12 +1,13 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { createTeamAction, cancelRegistration } from "@/actions/team";
-import { checkPaymentStatus } from "@/actions/payment";
+import { checkPaymentStatus, updatePaymentMethod, submitManualPaymentProofAction } from "@/actions/payment";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import StudentSelect from "@/components/form/StudentSelect";
-import { ChevronDownIcon, UserIcon as SearchIcon, PlusIcon } from '@/icons';
+import { ChevronDownIcon, PlusIcon } from '@/icons';
 import { useDialog } from "@/context/DialogContext";
+import { useUploadWithProgress } from "@/hooks/useUploadWithProgress";
 
 export default function RegistrationWizard({ meta, existingTeam }: { meta: any, existingTeam?: any }) {
     const { showAlert, showConfirm } = useDialog();
@@ -411,15 +412,39 @@ function MainIngredientCombobox({ items, selectedId, selectedName, onChange }: a
 // PAYMENT SECTION (Internal to Wizard now)
 // ----------------------------------------------------------------------
 
+type PaymentMethodOption = 'QRIS' | 'MANUAL_TRANSFER';
+
 function PaymentSection({ team, meta }: { team: any, meta: any }) {
     const { showAlert, showConfirm } = useDialog();
+    const paymentMethodFromServer: PaymentMethodOption = team.paymentMethod || 'QRIS';
+    const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>(paymentMethodFromServer);
     const [timeLeft, setTimeLeft] = useState("");
     const [expired, setExpired] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [switchingMethod, setSwitchingMethod] = useState(false);
+    const [manualAmount, setManualAmount] = useState<string>(() => {
+        if (typeof team.manualPaymentAmount === 'number' && team.manualPaymentAmount > 0) {
+            return String(team.manualPaymentAmount);
+        }
+        if (meta?.registrationFee) return String(meta.registrationFee);
+        return "";
+    });
+    const [manualNote, setManualNote] = useState<string>(team.manualPaymentNote || "");
+    const [manualProofKey, setManualProofKey] = useState<string | null>(team.manualPaymentProof || null);
+    const [manualProofUrl, setManualProofUrl] = useState<string | null>(team.manualPaymentProofUrl || null);
+    const [manualMessage, setManualMessage] = useState<string | null>(null);
+    const [submittingManual, setSubmittingManual] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const { uploadFile, progress, isUploading, error: uploadError } = useUploadWithProgress();
+
+    const manualSettings = meta?.manualPayment || {};
+    const registrationFee = meta?.registrationFee || 0;
+    const isManual = selectedMethod === 'MANUAL_TRANSFER';
+    const hasManualSubmission = Boolean(team.manualPaymentProof);
 
     useEffect(() => {
+        if (!team.paymentDeadline || selectedMethod !== 'QRIS') return;
         const timer = setInterval(() => {
-            if (!team.paymentDeadline) return;
             const deadline = new Date(team.paymentDeadline).getTime();
             const now = new Date().getTime();
             const diff = deadline - now;
@@ -435,79 +460,307 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
             }
         }, 1000);
         return () => clearInterval(timer);
-    }, [team.paymentDeadline]);
+    }, [team.paymentDeadline, selectedMethod]);
 
     const handleCancel = async () => {
         if (!(await showConfirm("Cancel registration and start over?", "warning"))) return;
         setLoading(true);
         await cancelRegistration();
         window.location.reload();
-    }
+    };
 
     const handleCheck = async () => {
         setLoading(true);
         const res = await checkPaymentStatus(team.id);
         if (res.success) {
-            // Success! Redirect to dashboard or show success message then redirect
             await showAlert("Payment Verified! Redirecting to dashboard...", "success");
             window.location.href = "/";
         } else {
             await showAlert(res.message || "Not paid yet", "info");
         }
         setLoading(false);
-    }
+    };
 
-    if (expired) {
-         return (
-             <div className="max-w-md mx-auto mt-10 p-8 bg-white border-2 border-red-100 rounded-xl shadow text-center">
-                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                     <span className="text-2xl">⚠️</span>
-                 </div>
-                 <h2 className="text-xl font-bold text-gray-800 mb-2">Reservation Expired</h2>
-                 <p className="text-gray-600 mb-6">Your 10 minute payment window has closed. The slot has been released.</p>
-                 <Button onClick={handleCancel}>Restart Registration</Button>
-             </div>
-         );
+    const handleMethodSelect = async (method: PaymentMethodOption) => {
+        if (method === selectedMethod) return;
+        setSwitchingMethod(true);
+        const res = await updatePaymentMethod(method);
+        setSwitchingMethod(false);
+        if ((res as any)?.error) {
+            await showAlert((res as any).error, "error");
+            return;
+        }
+        await showAlert(method === 'QRIS' ? "Switched to QRIS payment" : "Switched to manual transfer", "success");
+        window.location.reload();
+    };
+
+    const handleProofChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+            setManualMessage(null);
+            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_") || `proof-${Date.now()}`;
+            const uploadResult = await uploadFile(file, "manual-payments", `${team.id}-${safeName}`);
+            setManualProofKey(uploadResult.key);
+            setManualProofUrl(uploadResult.url || null);
+            await showAlert("Proof uploaded successfully.", "success");
+        } catch (error) {
+            console.error("Manual proof upload failed", error);
+            await showAlert("Failed to upload proof. Please try again.", "error");
+        } finally {
+            if (event.target) {
+                event.target.value = "";
+            }
+        }
+    };
+
+    const handleManualSubmit = async () => {
+        setManualMessage(null);
+        if (!manualProofKey) {
+            setManualMessage("Upload proof of payment before submitting.");
+            return;
+        }
+        const amountValue = manualAmount ? parseInt(manualAmount, 10) : registrationFee;
+        if (!amountValue || amountValue <= 0) {
+            setManualMessage("Enter a valid transfer amount.");
+            return;
+        }
+        setSubmittingManual(true);
+        const res = await submitManualPaymentProofAction({
+            amount: amountValue,
+            note: manualNote,
+            proofKey: manualProofKey,
+        });
+        setSubmittingManual(false);
+        if ((res as any)?.error) {
+            setManualMessage((res as any).error);
+            return;
+        }
+        await showAlert("Payment proof submitted. Please wait for admin verification.", "success");
+        window.location.reload();
+    };
+
+    if (selectedMethod === 'QRIS' && expired) {
+        return (
+            <div className="max-w-md mx-auto mt-10 p-8 bg-white border-2 border-red-100 rounded-xl shadow text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-2xl">⚠️</span>
+                </div>
+                <h2 className="text-xl font-bold text-gray-800 mb-2">Reservation Expired</h2>
+                <p className="text-gray-600 mb-6">Your payment window has closed. Please restart registration.</p>
+                <Button onClick={handleCancel}>Restart Registration</Button>
+            </div>
+        );
     }
 
     return (
-        <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-xl shadow-lg text-center dark:bg-gray-800 border border-gray-100">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                <span className="text-2xl">🎉</span>
-            </div>
-            <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Registration Successful!</h2>
-            <p className="text-gray-500 mb-6">Please complete payment within 10 minutes to secure your slot.</p>
-            
-            <div className="bg-orange-50 rounded-lg p-6 mb-8 border border-orange-100">
-                <p className="text-sm text-orange-600 uppercase font-bold tracking-wider mb-1">Time Remaining</p>
-                <div className="text-5xl font-mono font-bold text-gray-800">{timeLeft}</div>
-            </div>
-            
-            {team.paymentUrl ? (
-                 <div className="mb-8">
-                     <p className="mb-4 text-gray-500 font-medium">Click button below to pay via QRIS / E-Wallet</p>
-                     <a href={team.paymentUrl} target="_blank" className="bg-brand-600 text-white px-8 py-5 rounded-xl font-bold hover:bg-brand-700 block w-full text-xl shadow-xl transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3">
-                        <span>💳</span> PAY NOW
-                     </a>
-                     <p className="text-xs text-gray-400 mt-3">Secure payment via YoGateway</p>
-                 </div>
-            ) : (
-                <>
-                    <p className="mb-6 text-gray-500">Scan QR below to secure your slot</p>
-                    {meta?.paymentQr && (
-                        <div className="bg-white p-4 inline-block rounded-xl border mb-6 shadow-inner">
-                             <img src={meta.paymentQr} className="max-h-64 object-contain" alt="QR" /> 
-                        </div>
-                    )}
-                </>
-            )}
+        <div className="max-w-3xl mx-auto mt-10">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-6 md:p-8">
+                <div className="flex flex-col items-center text-center mb-8">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                        <span className="text-2xl">🎉</span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Registration Successful</h2>
+                    <p className="text-gray-500">Choose a payment method to secure your booth.</p>
+                </div>
 
-            <div className="flex flex-col gap-3 max-w-xs mx-auto">
-                <Button onClick={handleCheck} disabled={loading}>{loading ? "Verifying..." : "I Have Paid"}</Button>
-                <button onClick={handleCancel} className="text-gray-400 text-sm hover:underline mt-2">Cancel Registration</button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    {[
+                        { key: 'QRIS', title: 'QRIS / Virtual Account', desc: 'Instant confirmation via YoGateway', icon: '⚡' },
+                        { key: 'MANUAL_TRANSFER', title: 'Manual Bank Transfer', desc: 'Upload proof & wait for admin verification', icon: '🏦' },
+                    ].map((option) => (
+                        <button
+                            key={option.key}
+                            type="button"
+                            disabled={switchingMethod}
+                            onClick={() => handleMethodSelect(option.key as PaymentMethodOption)}
+                            className={`p-4 rounded-xl border text-left transition ${
+                                selectedMethod === option.key
+                                    ? 'border-brand-500 bg-brand-50'
+                                    : 'border-gray-200 hover:border-brand-200'
+                            }`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl">{option.icon}</span>
+                                <div>
+                                    <p className="font-semibold text-gray-800 dark:text-white">{option.title}</p>
+                                    <p className="text-sm text-gray-500">{option.desc}</p>
+                                </div>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+
+                {selectedMethod === 'QRIS' && (
+                    <div className="space-y-6 text-center">
+                        <div className="bg-orange-50 rounded-lg p-6 border border-orange-100">
+                            <p className="text-sm text-orange-600 uppercase font-bold tracking-wider mb-1">Time Remaining</p>
+                            <div className="text-5xl font-mono font-bold text-gray-800">{timeLeft || '--:--'}</div>
+                        </div>
+
+                        {team.paymentUrl ? (
+                            <div>
+                                <p className="mb-4 text-gray-500 font-medium">Click below to pay via QRIS / E-Wallet</p>
+                                <a
+                                    href={team.paymentUrl}
+                                    target="_blank"
+                                    className="bg-brand-600 text-white px-8 py-5 rounded-xl font-bold hover:bg-brand-700 block w-full text-xl shadow-xl transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3"
+                                >
+                                    <span>💳</span> PAY NOW
+                                </a>
+                                <p className="text-xs text-gray-400 mt-3">Secure payment via YoGateway</p>
+                            </div>
+                        ) : (
+                            <>
+                                <p className="mb-6 text-gray-500">Scan QR below to secure your slot</p>
+                                {meta?.paymentQr && (
+                                    <div className="bg-white p-4 inline-block rounded-xl border mb-6 shadow-inner">
+                                        <img src={meta.paymentQr} className="max-h-64 object-contain" alt="QR" />
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        <div className="flex flex-col gap-3 max-w-xs mx-auto">
+                            <Button onClick={handleCheck} disabled={loading}>
+                                {loading ? 'Verifying...' : 'I Have Paid'}
+                            </Button>
+                            <button onClick={handleCancel} className="text-gray-400 text-sm hover:underline mt-2">
+                                Cancel Registration
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {selectedMethod === 'MANUAL_TRANSFER' && (
+                    <div className="space-y-6 text-left">
+                        <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-3">Bank Transfer Details</h3>
+                            {manualSettings.bankName || manualSettings.accountNumber ? (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                    <div>
+                                        <p className="text-gray-500 uppercase text-xs">Bank</p>
+                                        <p className="font-bold text-lg text-gray-900 dark:text-white">{manualSettings.bankName || '-'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-500 uppercase text-xs">Account Number</p>
+                                        <p className="font-bold text-lg text-gray-900 dark:text-white">{manualSettings.accountNumber || '-'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-500 uppercase text-xs">Account Name</p>
+                                        <p className="font-bold text-lg text-gray-900 dark:text-white">{manualSettings.accountName || '-'}</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-red-500">Bank information is not configured. Please contact the committee.</p>
+                            )}
+                            {manualSettings.instructions && (
+                                <p className="text-xs text-gray-500 mt-3 whitespace-pre-line">{manualSettings.instructions}</p>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="p-4 border rounded-lg">
+                                <p className="text-xs uppercase text-gray-500">Nominal to Transfer</p>
+                                <p className="text-3xl font-bold text-gray-800">
+                                    {formatCurrencyId(manualAmount ? parseInt(manualAmount, 10) : registrationFee)}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">Default fee: {formatCurrencyId(registrationFee)}</p>
+                            </div>
+                            <div>
+                                <Label>Enter Transfer Amount</Label>
+                                <Input
+                                    type="text"
+                                    value={manualAmount}
+                                    onChange={(e) => setManualAmount(e.target.value.replace(/[^0-9]/g, ''))}
+                                    placeholder={registrationFee ? String(registrationFee) : 'e.g. 150000'}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <Label>Payment Note (optional)</Label>
+                            <textarea
+                                className="w-full border rounded-lg p-3 mt-1 focus:ring-2 focus:ring-brand-500 dark:bg-gray-900"
+                                rows={3}
+                                value={manualNote}
+                                onChange={(e) => setManualNote(e.target.value)}
+                                placeholder="Enter bank name, sender info, or other details"
+                            />
+                        </div>
+
+                        <div>
+                            <Label>Upload Proof of Transfer</Label>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*,.pdf"
+                                className="hidden"
+                                onChange={handleProofChange}
+                            />
+                            {manualProofUrl ? (
+                                <div className="mt-3 space-y-3">
+                                    {/\.(png|jpg|jpeg|gif|webp)$/i.test(manualProofUrl) ? (
+                                        <img src={manualProofUrl} alt="Payment Proof" className="max-h-72 rounded-lg border" />
+                                    ) : (
+                                        <a href={manualProofUrl} target="_blank" className="text-brand-600 underline">
+                                            View uploaded proof
+                                        </a>
+                                    )}
+                                    <button
+                                        type="button"
+                                        className="px-4 py-2 border rounded-lg text-sm"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isUploading}
+                                    >
+                                        Upload New Proof
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="mt-3 w-full border-2 border-dashed border-gray-300 rounded-lg p-6 text-center text-gray-500 hover:border-brand-400"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isUploading}
+                                >
+                                    {isUploading ? 'Uploading...' : 'Click to upload proof'}
+                                </button>
+                            )}
+                            {isUploading && (
+                                <div className="mt-2 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                    <div className="bg-brand-500 h-full" style={{ width: `${progress}%` }} />
+                                </div>
+                            )}
+                            {uploadError && <p className="text-red-500 text-sm mt-2">{uploadError}</p>}
+                        </div>
+
+                        {hasManualSubmission && (
+                            <div className="p-4 border rounded-lg bg-green-50 text-green-800">
+                                <p className="font-semibold">Proof uploaded</p>
+                                <p className="text-sm">Waiting for admin verification. Status: {team.paymentStatus}</p>
+                            </div>
+                        )}
+
+                        {manualMessage && <p className="text-red-500 text-sm">{manualMessage}</p>}
+
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                            <Button onClick={handleManualSubmit} disabled={submittingManual || isUploading}>
+                                {submittingManual ? 'Submitting...' : 'Submit Proof for Verification'}
+                            </Button>
+                            <button onClick={handleCancel} className="text-gray-400 text-sm hover:underline">
+                                Cancel Registration
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
+}
+
+function formatCurrencyId(amount: number) {
+    if (!Number.isFinite(amount)) return 'Rp 0';
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount || 0);
 }
 
 function Button({ children, onClick, disabled, secondary }: any) {
