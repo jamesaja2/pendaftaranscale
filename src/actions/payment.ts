@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { checkYoGatewayPaymentStatus } from '@/lib/yogateway';
+import { checkYoGatewayPaymentStatus, createYoGatewayPayment } from '@/lib/yogateway';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -62,23 +62,57 @@ export async function updatePaymentMethod(option: PaymentMethodOption) {
     return { error: 'Team not found' };
   }
 
+  if (team.paymentStatus === 'PAID' || team.paymentStatus === 'VERIFIED') {
+    return { error: 'Payment already completed' };
+  }
+
+  if (team.paymentMethod === option && option === 'QRIS' && team.paymentTrxId) {
+    return { success: true };
+  }
+
   const data: any = {
     paymentMethod: option,
+    paymentStatus: 'PENDING',
+    paidAt: null,
   };
 
   if (option === 'QRIS') {
-    const deadline = new Date();
-    deadline.setMinutes(deadline.getMinutes() + 10);
-    data.paymentDeadline = deadline;
-  } else {
-    data.paymentDeadline = null;
-  }
+    const feeSetting = await prisma.globalSettings.findUnique({ where: { key: 'registration_fee' } });
+    const feeValue = feeSetting?.value ? parseInt(feeSetting.value, 10) : 0;
+    if (!feeValue || feeValue < 1000) {
+      return { error: 'Registration fee must be at least IDR 1,000 before enabling QRIS payments.' };
+    }
 
-  if (option === 'QRIS') {
+    const payment = await createYoGatewayPayment(feeValue);
+    if (!payment.success || !payment.data) {
+      return { error: payment.error || 'Failed to create QRIS payment session. Please try again.' };
+    }
+
+    const { trx_id, payment_url, expired_at } = payment.data as any;
+    if (!trx_id || !payment_url) {
+      return { error: 'Incomplete response from payment gateway.' };
+    }
+
+    const parsedDeadline = expired_at ? new Date(expired_at) : null;
+    const deadline = parsedDeadline && !isNaN(parsedDeadline.getTime())
+      ? parsedDeadline
+      : (() => {
+          const fallback = new Date();
+          fallback.setMinutes(fallback.getMinutes() + 10);
+          return fallback;
+        })();
+
+    data.paymentTrxId = trx_id;
+    data.paymentUrl = payment_url;
+    data.paymentDeadline = deadline;
     data.manualPaymentAmount = null;
     data.manualPaymentNote = null;
     data.manualPaymentProof = null;
     data.manualPaymentSubmittedAt = null;
+  } else {
+    data.paymentDeadline = null;
+    data.paymentTrxId = null;
+    data.paymentUrl = null;
   }
 
   await prisma.team.update({

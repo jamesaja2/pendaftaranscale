@@ -6,7 +6,6 @@ import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 
-import { createYoGatewayPayment } from "@/lib/yogateway";
 
 const CreateTeamSchema = z.object({
   name: z.string().min(3),
@@ -132,33 +131,6 @@ export async function createTeamAction(data: z.infer<typeof CreateTeamSchema>) {
         const deadline = new Date();
         deadline.setMinutes(deadline.getMinutes() + 10);
         
-        // Dynamic Payment
-        let paymentUrl = null;
-        let paymentTrxId = `TRX-${Date.now()}`;
-        
-        // Fee Calculation
-        const fee = parseInt(sMap['registration_fee'] || "0");
-        
-        if (fee > 0) {
-            // Call YoGateway
-            // Note: Since we are inside a transaction, we should be careful about external API calls.
-            // Ideally we do it before or after. But for simplicity we do it here. 
-            // If API fails, we throw and rollback db.
-            
-            // We need to use settings from outside tx or fetch inside. We have sMap.
-            // But createYoGatewayPayment fetches from DB again. That's fine.
-             const payRes = await createYoGatewayPayment(fee);
-             if (!payRes.success) {
-                 throw new Error(payRes.error || "Payment Gateway Error");
-             }
-             paymentUrl = payRes.data.payment_url;
-             // If YoGateway returns a QR Image, we might want to store it too? 
-             // Using paymentUrl is safer as it redirects to their page which has QR.
-             // Or if we want embedded: payRes.data.qr_image
-             // Let's store paymentUrl primarily.
-             paymentTrxId = payRes.data.trx_id;
-        }
-
         const newTeam = await tx.team.create({
             data: {
                 name,
@@ -170,10 +142,10 @@ export async function createTeamAction(data: z.infer<typeof CreateTeamSchema>) {
                 boothLocationId,
                 userId: user.id,
                 paymentStatus: 'PENDING',
-                paymentMethod: 'QRIS',
+                paymentMethod: 'MANUAL_TRANSFER',
                 paymentDeadline: deadline,
-                paymentTrxId: paymentTrxId,
-                paymentUrl: paymentUrl // We need to add this to schema OR Use existing optional field
+                paymentTrxId: null,
+                paymentUrl: null
             }
         });
 
