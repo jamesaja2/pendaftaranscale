@@ -1,10 +1,10 @@
 import React from "react";
-import { getUsers } from "@/actions/user";
 import UserTable from "./UserTable";
 
-export default async function UsersPage() {
-  const { data: users, error } = await getUsers();
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
+export default function UsersPage() {
   return (
     <div>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -14,7 +14,7 @@ export default async function UsersPage() {
       </div>
 
       <div className="flex flex-col gap-10">
-        <UserTable users={users || []} />
+        <UserTable />
       </div>
     </div>
   );

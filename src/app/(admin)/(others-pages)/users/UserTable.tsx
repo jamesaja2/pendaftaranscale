@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createUser, deleteUser } from "@/actions/user";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
@@ -7,15 +7,19 @@ import { useDialog } from "@/context/DialogContext";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Badge from "@/components/ui/badge/Badge";
-import Image from "next/image";
+import { twMerge } from "tailwind-merge";
 
-export default function UserTable({ users }: { users: any[] }) {
+const PAGE_SIZE_PRESETS = [5, 10, 25, 50];
+
+export default function UserTable() {
     const { showAlert, showConfirm } = useDialog();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
-    
-    // Validate and normalize users array
-    const safeUsers = Array.isArray(users) ? users.filter(u => u && u.id && u.email) : [];
+    const [formSubmitting, setFormSubmitting] = useState(false);
+    const [tableLoading, setTableLoading] = useState(true);
+    const [tableError, setTableError] = useState<string | null>(null);
+    const [users, setUsers] = useState<any[]>([]);
+    const [rowsPerPage, setRowsPerPage] = useState<number>(10);
+    const [currentPage, setCurrentPage] = useState(1);
     
     // Form State
     const [formData, setFormData] = useState({
@@ -24,15 +28,46 @@ export default function UserTable({ users }: { users: any[] }) {
         role: "ADMIN"
     });
 
+    const fetchUsers = useCallback(async () => {
+        try {
+            setTableLoading(true);
+            setTableError(null);
+            const response = await fetch("/api/admin/users", { cache: "no-store" });
+            if (!response.ok) throw new Error("Failed to fetch users");
+            const payload = await response.json();
+            const list = Array.isArray(payload?.data) ? payload.data : [];
+            setUsers(list);
+            // Clamp current page if dataset shrinks
+            setCurrentPage((prev) => {
+                const maxPage = Math.max(1, Math.ceil(list.length / rowsPerPage));
+                return Math.min(prev, maxPage);
+            });
+        } catch (error: any) {
+            console.error("Failed to load users", error);
+            setTableError(error?.message || "Failed to load users");
+        } finally {
+            setTableLoading(false);
+        }
+    }, [rowsPerPage]);
+
+    useEffect(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [rowsPerPage]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
+        setFormSubmitting(true);
         const res = await createUser(formData);
-        setLoading(false);
+        setFormSubmitting(false);
         if (res.success) {
             setIsModalOpen(false);
             setFormData({ email: "", password: "", role: "ADMIN" });
             await showAlert("User created successfully", "success");
+            fetchUsers();
         } else {
             await showAlert(res.error || "Failed", "error");
         }
@@ -40,12 +75,50 @@ export default function UserTable({ users }: { users: any[] }) {
 
     const handleDelete = async (id: string) => {
         if (!(await showConfirm("Are you sure you want to delete this user?", "error"))) return;
-        await deleteUser(id);
+        const res = await deleteUser(id);
+        if ((res as any)?.error) {
+            await showAlert((res as any).error, "error");
+            return;
+        }
+        await showAlert("User removed", "success");
+        fetchUsers();
     };
+
+    const totalUsers = users.length;
+    const totalPages = Math.max(1, Math.ceil(totalUsers / rowsPerPage));
+    const clampedPage = Math.min(currentPage, totalPages);
+    const startIndex = (clampedPage - 1) * rowsPerPage;
+    const endIndex = Math.min(startIndex + rowsPerPage, totalUsers);
+    const visibleUsers = users.slice(startIndex, endIndex);
+
+    const paginationLabel = tableLoading
+        ? "Loading..."
+        : totalUsers === 0
+            ? "No users"
+            : `Showing ${startIndex + 1} to ${endIndex} of ${totalUsers} users`;
 
     return (
         <div>
-            <div className="flex justify-end mb-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <span>Show</span>
+                    <select
+                        className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+                        value={rowsPerPage}
+                        onChange={(e) => setRowsPerPage(Number(e.target.value))}
+                    >
+                        {PAGE_SIZE_PRESETS.map((size) => (
+                            <option key={size} value={size}>
+                                {size}
+                            </option>
+                        ))}
+                    </select>
+                    <span>entries</span>
+                </div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {paginationLabel}
+                </div>
+                <div className="flex justify-end">
                 <button 
                     onClick={() => setIsModalOpen(true)}
                     className="flex items-center gap-2 rounded-lg bg-brand-500 px-6 py-3 font-medium text-white hover:bg-brand-600"
@@ -56,6 +129,7 @@ export default function UserTable({ users }: { users: any[] }) {
                     </svg>
                     Add User
                 </button>
+                </div>
             </div>
 
             <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
@@ -79,7 +153,26 @@ export default function UserTable({ users }: { users: any[] }) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                                {safeUsers.map((user) => (
+                                {tableLoading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="px-5 py-6 text-center text-gray-500">
+                                            Loading users...
+                                        </TableCell>
+                                    </TableRow>
+                                ) : tableError ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="px-5 py-6 text-center text-red-500">
+                                            {tableError}
+                                        </TableCell>
+                                    </TableRow>
+                                ) : visibleUsers.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="px-5 py-6 text-center text-gray-500">
+                                            No users found
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    visibleUsers.map((user) => (
                                     <TableRow key={user.id}>
                                         <TableCell className="px-5 py-4 sm:px-6 text-start">
                                             <div className="flex items-center gap-3">
@@ -116,10 +209,43 @@ export default function UserTable({ users }: { users: any[] }) {
                                             </button>
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                ))) }
                             </TableBody>
                         </Table>
                     </div>
+                </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
+                <p className="text-sm text-gray-500 dark:text-gray-400">{paginationLabel}</p>
+                <div className="flex items-center gap-2">
+                    <button
+                        className={twMerge(
+                            "px-4 py-2 rounded-lg border text-sm",
+                            clampedPage === 1
+                                ? "cursor-not-allowed border-gray-200 text-gray-400"
+                                : "border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:text-white"
+                        )}
+                        disabled={clampedPage === 1 || tableLoading}
+                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    >
+                        Previous
+                    </button>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                        Page {clampedPage} of {totalPages}
+                    </span>
+                    <button
+                        className={twMerge(
+                            "px-4 py-2 rounded-lg border text-sm",
+                            clampedPage >= totalPages
+                                ? "cursor-not-allowed border-gray-200 text-gray-400"
+                                : "border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:text-white"
+                        )}
+                        disabled={clampedPage >= totalPages || tableLoading}
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    >
+                        Next
+                    </button>
                 </div>
             </div>
 
@@ -159,10 +285,10 @@ export default function UserTable({ users }: { users: any[] }) {
                         <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">Cancel</button>
                         <button 
                             type="submit" 
-                            disabled={loading}
+                            disabled={formSubmitting}
                             className="px-6 py-2 bg-brand-500 text-white rounded hover:bg-brand-600 disabled:opacity-50"
                         >
-                            {loading ? "Saving..." : "Create User"}
+                            {formSubmitting ? "Saving..." : "Create User"}
                         </button>
                     </div>
                 </form>
