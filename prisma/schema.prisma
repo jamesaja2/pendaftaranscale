@@ -34,6 +34,11 @@ enum PaymentMethod {
   MANUAL_TRANSFER
 }
 
+enum PaymentPlan {
+  FULL
+  DOWN_PAYMENT
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -138,6 +143,8 @@ model Team {
   paymentUrl      String?       // Deprecated if using embedded QR, but good to keep
   paidAt          DateTime?
   paymentDeadline DateTime?
+  paymentPlan     PaymentPlan?
+  paymentPlanAcceptedAt DateTime?
   manualPaymentAmount Int?
   manualPaymentNote   String?    @db.Text
   manualPaymentProof  String?

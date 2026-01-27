@@ -50,6 +50,7 @@ export async function checkPaymentStatus(teamId: string) {
 }
 
 type PaymentMethodOption = 'QRIS' | 'MANUAL_TRANSFER';
+type PaymentPlanOption = 'FULL' | 'DOWN_PAYMENT';
 
 export async function updatePaymentMethod(option: PaymentMethodOption) {
   const session = await getServerSession(authOptions);
@@ -60,6 +61,14 @@ export async function updatePaymentMethod(option: PaymentMethodOption) {
   const team = await prisma.team.findUnique({ where: { userId: (session.user as any).id } });
   if (!team) {
     return { error: 'Team not found' };
+  }
+
+  if (!team.paymentPlan) {
+    return { error: 'Please choose a payment plan before selecting a payment method.' };
+  }
+
+  if (team.paymentPlan === 'DOWN_PAYMENT' && !team.paymentPlanAcceptedAt) {
+    return { error: 'Accept the down payment terms before continuing.' };
   }
 
   if (team.paymentStatus === 'PAID' || team.paymentStatus === 'VERIFIED') {
@@ -113,6 +122,45 @@ export async function updatePaymentMethod(option: PaymentMethodOption) {
     data.paymentDeadline = null;
     data.paymentTrxId = null;
     data.paymentUrl = null;
+  }
+
+  await prisma.team.update({
+    where: { id: team.id },
+    data,
+  });
+
+  revalidatePath('/');
+  revalidatePath('/register');
+  return { success: true };
+}
+
+export async function updatePaymentPlan(option: PaymentPlanOption, acceptTerms?: boolean) {
+  const session = await getServerSession(authOptions);
+  if (!session || !(session.user as any)?.id) {
+    return { error: 'Unauthorized' };
+  }
+
+  const team = await prisma.team.findUnique({ where: { userId: (session.user as any).id } });
+  if (!team) {
+    return { error: 'Team not found' };
+  }
+
+  if (team.paymentStatus === 'PAID' || team.paymentStatus === 'VERIFIED') {
+    return { error: 'Payment already completed' };
+  }
+
+  if (option === 'DOWN_PAYMENT' && !acceptTerms) {
+    return { error: 'You must accept the down payment terms before continuing.' };
+  }
+
+  const data: any = {
+    paymentPlan: option,
+  };
+
+  if (option === 'FULL') {
+    data.paymentPlanAcceptedAt = new Date();
+  } else if (option === 'DOWN_PAYMENT') {
+    data.paymentPlanAcceptedAt = acceptTerms ? new Date() : null;
   }
 
   await prisma.team.update({

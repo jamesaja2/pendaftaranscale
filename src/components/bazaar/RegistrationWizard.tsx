@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { createTeamAction, cancelRegistration } from "@/actions/team";
-import { checkPaymentStatus, updatePaymentMethod, submitManualPaymentProofAction } from "@/actions/payment";
+import { checkPaymentStatus, updatePaymentMethod, submitManualPaymentProofAction, updatePaymentPlan } from "@/actions/payment";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import StudentSelect from "@/components/form/StudentSelect";
@@ -413,11 +413,112 @@ function MainIngredientCombobox({ items, selectedId, selectedName, onChange }: a
 // ----------------------------------------------------------------------
 
 type PaymentMethodOption = 'QRIS' | 'MANUAL_TRANSFER';
+type PaymentPlanOption = 'FULL' | 'DOWN_PAYMENT';
 
 function PaymentSection({ team, meta }: { team: any, meta: any }) {
     const { showAlert, showConfirm } = useDialog();
     const paymentMethodFromServer: PaymentMethodOption = team.paymentMethod || 'QRIS';
     const paymentOptionsFlags = meta?.paymentOptions || { qrisEnabled: true, manualEnabled: true };
+    const paymentPlan = (team.paymentPlan as PaymentPlanOption | null) || null;
+    const paymentPlanAcceptedAt = team.paymentPlanAcceptedAt ? new Date(team.paymentPlanAcceptedAt) : null;
+    const planReady = paymentPlan === 'FULL' || (paymentPlan === 'DOWN_PAYMENT' && !!paymentPlanAcceptedAt);
+    const planLabelMap: Record<PaymentPlanOption, string> = {
+        FULL: 'Full Payment',
+        DOWN_PAYMENT: 'Down Payment',
+    };
+    const registrationFee = meta?.registrationFee || 0;
+    const downPaymentAmount = meta?.downPaymentAmount || 50000;
+    const downPaymentDisplay = formatCurrencyId(downPaymentAmount);
+    const [planTermsOpen, setPlanTermsOpen] = useState(false);
+    const [pendingPlan, setPendingPlan] = useState<PaymentPlanOption | null>(null);
+    const [planActionLoading, setPlanActionLoading] = useState(false);
+    const termsContentRef = useRef<HTMLDivElement | null>(null);
+    const planCards: Array<{ key: PaymentPlanOption; title: string; highlight: string; bullets: string[] }> = [
+        {
+            key: 'FULL',
+            title: 'Full Payment',
+            highlight: 'Pay everything now',
+            bullets: [
+                'Entire registration fee paid upfront',
+                'No deductions from future sales',
+                'Fastest verification and booth locking',
+            ],
+        },
+        {
+            key: 'DOWN_PAYMENT',
+            title: 'Down Payment',
+            highlight: 'Split into two phases',
+            bullets: [
+                `Bayar ${downPaymentDisplay} sebagai komitmen awal`,
+                'Sisa biaya otomatis dipotong dari hasil bazaar resmi',
+                'Status tim tertandai sebagai "Down Payment" di panel admin',
+                'Wajib menyetujui ketentuan pelunasan sebelum lanjut',
+            ],
+        },
+    ];
+    const downPaymentTerms = [
+        `Pembayaran down payment sebesar ${downPaymentDisplay} bersifat komitmen awal dan tidak dapat dikembalikan.`,
+        'Sisa biaya registrasi akan otomatis dipotong dari hasil penjualan resmi bazaar saat proses settlement.',
+        'Jika hasil penjualan tidak mencukupi, tim wajib melunasi kekurangan sebelum menerima pembagian keuntungan.',
+        'Panitia dapat menahan atau memotong hasil penjualan hingga seluruh biaya registrasi terpenuhi.',
+        'Keterlambatan melunasi kekurangan dapat menyebabkan penundaan distribusi keuntungan atau penangguhan partisipasi.',
+        'Status pembayaran Anda akan ditandai sebagai "Down Payment" pada panel admin untuk memudahkan verifikasi.',
+        'Dengan menyetujui, tim memahami bahwa hak atas booth dapat dicabut bila kewajiban pembayaran tidak dipenuhi.',
+    ];
+
+    useEffect(() => {
+        if (planTermsOpen && pendingPlan === 'DOWN_PAYMENT') {
+            requestAnimationFrame(() => {
+                if (termsContentRef.current) {
+                    termsContentRef.current.scrollTop = 0;
+                }
+            });
+        }
+    }, [planTermsOpen, pendingPlan]);
+
+    const handlePlanSelection = async (option: PaymentPlanOption) => {
+        if (planActionLoading) return;
+        if (option === 'DOWN_PAYMENT') {
+            setPendingPlan('DOWN_PAYMENT');
+            setPlanTermsOpen(true);
+            return;
+        }
+        if (paymentPlan === 'FULL' && planReady) {
+            await showAlert('You are already on the full payment plan.', 'info');
+            return;
+        }
+        setPlanActionLoading(true);
+        const res = await updatePaymentPlan('FULL', true);
+        setPlanActionLoading(false);
+        if ((res as any)?.error) {
+            await showAlert((res as any).error, 'error');
+            return;
+        }
+        await showAlert('Full payment selected. You can continue to payment.', 'success');
+        window.location.reload();
+    };
+
+    const handleAcceptDownPaymentTerms = async () => {
+        if (planActionLoading) return;
+        setPlanActionLoading(true);
+        const res = await updatePaymentPlan('DOWN_PAYMENT', true);
+        setPlanActionLoading(false);
+        if ((res as any)?.error) {
+            await showAlert((res as any).error, 'error');
+            return;
+        }
+        setPlanTermsOpen(false);
+        await showAlert('Down payment terms accepted. Continue to payment.', 'success');
+        window.location.reload();
+    };
+
+    const handleClosePlanModal = () => {
+        if (planActionLoading) return;
+        setPlanTermsOpen(false);
+        setPendingPlan(null);
+    };
+    const planSelectedLabel = paymentPlan ? planLabelMap[paymentPlan] : null;
+    const acceptedDateLabel = paymentPlanAcceptedAt ? paymentPlanAcceptedAt.toLocaleDateString('id-ID') : null;
     const methodDefinitions: Array<{
         key: PaymentMethodOption;
         title: string;
@@ -451,14 +552,21 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
     const [expired, setExpired] = useState(false);
     const [loading, setLoading] = useState(false);
     const [switchingMethod, setSwitchingMethod] = useState(false);
+    const defaultManualAmount = paymentPlan === 'DOWN_PAYMENT' ? downPaymentAmount : registrationFee;
     const [manualAmount, setManualAmount] = useState<string>(() => {
         if (typeof team.manualPaymentAmount === 'number' && team.manualPaymentAmount > 0) {
             return String(team.manualPaymentAmount);
         }
-        if (meta?.registrationFee) return String(meta.registrationFee);
+        if (defaultManualAmount > 0) return String(defaultManualAmount);
         return "";
     });
-    const [manualNote, setManualNote] = useState<string>(team.manualPaymentNote || "");
+    const [manualNote, setManualNote] = useState<string>(() => {
+        if (team.manualPaymentNote) return team.manualPaymentNote;
+        if (paymentPlan === 'DOWN_PAYMENT') {
+            return `Down payment ${downPaymentDisplay} (akan dilunasi dari hasil penjualan)`;
+        }
+        return "";
+    });
     const [manualProofKey, setManualProofKey] = useState<string | null>(team.manualPaymentProof || null);
     const [manualProofUrl, setManualProofUrl] = useState<string | null>(team.manualPaymentProofUrl || null);
     const [manualMessage, setManualMessage] = useState<string | null>(null);
@@ -467,9 +575,9 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
     const { uploadFile, progress, isUploading, error: uploadError } = useUploadWithProgress();
 
     const manualSettings = meta?.manualPayment || {};
-    const registrationFee = meta?.registrationFee || 0;
     const isManual = selectedMethod === 'MANUAL_TRANSFER';
     const hasManualSubmission = Boolean(team.manualPaymentProof);
+    const expectedTransferAmount = paymentPlan === 'DOWN_PAYMENT' ? downPaymentAmount : registrationFee;
 
     useEffect(() => {
         if (!team.paymentDeadline || selectedMethod !== 'QRIS') return;
@@ -553,15 +661,20 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
             setManualMessage("Upload proof of payment before submitting.");
             return;
         }
-        const amountValue = manualAmount ? parseInt(manualAmount, 10) : registrationFee;
+        const amountValue = manualAmount ? parseInt(manualAmount, 10) : expectedTransferAmount;
         if (!amountValue || amountValue <= 0) {
             setManualMessage("Enter a valid transfer amount.");
             return;
         }
+        const trimmedNote = manualNote.trim();
+        const finalNote =
+            paymentPlan === 'DOWN_PAYMENT'
+                ? `[DOWN PAYMENT] ${trimmedNote || `Konfirmasi DP ${downPaymentDisplay}`}`
+                : trimmedNote || undefined;
         setSubmittingManual(true);
         const res = await submitManualPaymentProofAction({
             amount: amountValue,
-            note: manualNote,
+            note: finalNote,
             proofKey: manualProofKey,
         });
         setSubmittingManual(false);
@@ -599,7 +712,8 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
     }
 
     return (
-        <div className="max-w-3xl mx-auto mt-10">
+        <>
+            <div className="max-w-3xl mx-auto mt-10">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-6 md:p-8">
                 <div className="flex flex-col items-center text-center mb-8">
                     <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -609,38 +723,125 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
                     <p className="text-gray-500">Choose a payment method to secure your booth.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                    {methodDefinitions
-                        .filter((option) => option.enabled || paymentMethodFromServer === option.key)
-                        .map((option) => (
-                            <button
-                                key={option.key}
-                                type="button"
-                                disabled={switchingMethod || !option.enabled}
-                                onClick={() => handleMethodSelect(option.key as PaymentMethodOption)}
-                                className={`p-4 rounded-xl border text-left transition ${
-                                    selectedMethod === option.key
-                                        ? 'border-brand-500 bg-brand-50'
-                                        : 'border-gray-200 hover:border-brand-200'
-                                }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <span className="text-2xl">{option.icon}</span>
-                                    <div>
-                                        <p className="font-semibold text-gray-800 dark:text-white">{option.title}</p>
-                                        <p className="text-sm text-gray-500">{option.desc}</p>
-                                    </div>
-                                </div>
-                                {!option.enabled && paymentMethodFromServer === option.key && (
-                                    <p className="text-xs text-red-500 mt-2">
-                                        Disabled by admin. Please switch payment method.
-                                    </p>
-                                )}
-                            </button>
-                        ))}
-                </div>
+                <section className="w-full mb-10">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Pilih Skema Pembayaran</h3>
+                            <p className="text-sm text-gray-500">Tentukan apakah ingin membayar penuh atau menggunakan down payment.</p>
+                        </div>
+                        {planSelectedLabel && (
+                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                                Saat ini: {planSelectedLabel}
+                            </span>
+                        )}
+                    </div>
 
-                {selectedMethod === 'QRIS' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+                        {planCards.map((card) => {
+                            const isSelected = paymentPlan === card.key;
+                            return (
+                                <button
+                                    key={card.key}
+                                    type="button"
+                                    onClick={() => handlePlanSelection(card.key)}
+                                    disabled={planActionLoading}
+                                    className={`text-left rounded-2xl border p-5 transition focus:outline-none ${
+                                        isSelected
+                                            ? 'border-brand-500 bg-brand-50 shadow-lg'
+                                            : 'border-gray-200 hover:border-brand-200 dark:border-gray-700'
+                                    } ${planActionLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-xs uppercase tracking-widest text-gray-500">{card.highlight}</p>
+                                            <p className="text-xl font-semibold text-gray-800 dark:text-white">{card.title}</p>
+                                        </div>
+                                        {isSelected && (
+                                            <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-brand-600">
+                                                Selected
+                                            </span>
+                                        )}
+                                    </div>
+                                    <ul className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                                        {card.bullets.map((point) => (
+                                            <li key={point} className="flex items-start gap-2">
+                                                <span className="mt-1 h-2 w-2 rounded-full bg-brand-500"></span>
+                                                <span>{point}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    {card.key === 'DOWN_PAYMENT' && (
+                                        <p className="mt-3 text-xs font-medium text-orange-600">Harus menyetujui syarat & ketentuan sebelum melanjutkan.</p>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {planReady && paymentPlan && (
+                        <div className="mt-4 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-500/40 dark:bg-green-900/20 dark:text-green-200">
+                            <p className="font-semibold">Skema terpilih: {planLabelMap[paymentPlan]}</p>
+                            {paymentPlan === 'DOWN_PAYMENT' ? (
+                                <div className="mt-1 flex flex-wrap items-center gap-3">
+                                    <span>Syarat diterima {acceptedDateLabel || '---'}.</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPendingPlan('DOWN_PAYMENT');
+                                            setPlanTermsOpen(true);
+                                        }}
+                                        className="text-brand-600 hover:underline"
+                                    >
+                                        Lihat ulang syarat
+                                    </button>
+                                </div>
+                            ) : (
+                                <p className="mt-1">Anda akan menyelesaikan seluruh biaya pendaftaran sekarang.</p>
+                            )}
+                        </div>
+                    )}
+                </section>
+
+                {!planReady && (
+                    <div className="rounded-xl border border-dashed border-orange-200 bg-orange-50 p-6 text-center text-sm text-orange-700 dark:border-orange-400/40 dark:bg-orange-950/20 dark:text-orange-200">
+                        Pilih skema pembayaran terlebih dahulu untuk membuka opsi pembayaran.
+                    </div>
+                )}
+
+                {planReady && (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                            {methodDefinitions
+                                .filter((option) => option.enabled || paymentMethodFromServer === option.key)
+                                .map((option) => (
+                                    <button
+                                        key={option.key}
+                                        type="button"
+                                        disabled={switchingMethod || !option.enabled}
+                                        onClick={() => handleMethodSelect(option.key as PaymentMethodOption)}
+                                        className={`p-4 rounded-xl border text-left transition ${
+                                            selectedMethod === option.key
+                                                ? 'border-brand-500 bg-brand-50'
+                                                : 'border-gray-200 hover:border-brand-200'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-2xl">{option.icon}</span>
+                                            <div>
+                                                <p className="font-semibold text-gray-800 dark:text-white">{option.title}</p>
+                                                <p className="text-sm text-gray-500">{option.desc}</p>
+                                            </div>
+                                        </div>
+                                        {!option.enabled && paymentMethodFromServer === option.key && (
+                                            <p className="text-xs text-red-500 mt-2">
+                                                Disabled by admin. Please switch payment method.
+                                            </p>
+                                        )}
+                                    </button>
+                                ))}
+                        </div>
+
+                        {selectedMethod === 'QRIS' && (
                     <div className="space-y-6 text-center">
                         <div className="bg-orange-50 rounded-lg p-6 border border-orange-100">
                             <p className="text-sm text-orange-600 uppercase font-bold tracking-wider mb-1">Time Remaining</p>
@@ -679,10 +880,15 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
                             </button>
                         </div>
                     </div>
-                )}
+                    )}
 
-                {selectedMethod === 'MANUAL_TRANSFER' && (
+                    {selectedMethod === 'MANUAL_TRANSFER' && (
                     <div className="space-y-6 text-left">
+                        {paymentPlan === 'DOWN_PAYMENT' && (
+                            <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800">
+                                Pembayaran ini akan dicatat sebagai down payment sebesar <strong>{downPaymentDisplay}</strong>. Sisa biaya otomatis dipotong saat settlement penjualan bazaar Anda.
+                            </div>
+                        )}
                         <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
                             <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-3">Bank Transfer Details</h3>
                             {manualSettings.bankName || manualSettings.accountNumber ? (
@@ -712,9 +918,14 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
                             <div className="p-4 border rounded-lg">
                                 <p className="text-xs uppercase text-gray-500">Nominal to Transfer</p>
                                 <p className="text-3xl font-bold text-gray-800">
-                                    {formatCurrencyId(manualAmount ? parseInt(manualAmount, 10) : registrationFee)}
+                                    {formatCurrencyId(manualAmount ? parseInt(manualAmount, 10) : expectedTransferAmount)}
                                 </p>
-                                <p className="text-xs text-gray-500 mt-1">Default fee: {formatCurrencyId(registrationFee)}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {paymentPlan === 'DOWN_PAYMENT'
+                                        ? `DP minimum ${downPaymentDisplay}. Sisa biaya dipotong setelah event.`
+                                        : `Default fee: ${formatCurrencyId(registrationFee)}`
+                                    }
+                                </p>
                             </div>
                             <div>
                                 <Label>Enter Transfer Amount</Label>
@@ -722,7 +933,7 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
                                     type="text"
                                     value={manualAmount}
                                     onChange={(e) => setManualAmount(e.target.value.replace(/[^0-9]/g, ''))}
-                                    placeholder={registrationFee ? String(registrationFee) : 'e.g. 150000'}
+                                    placeholder={expectedTransferAmount ? String(expectedTransferAmount) : 'e.g. 150000'}
                                 />
                             </div>
                         </div>
@@ -736,6 +947,11 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
                                 onChange={(e) => setManualNote(e.target.value)}
                                 placeholder="Enter bank name, sender info, or other details"
                             />
+                            {paymentPlan === 'DOWN_PAYMENT' && (
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Catatan akan otomatis diberi label <span className="font-semibold text-orange-600">Down Payment</span> pada panel admin.
+                                </p>
+                            )}
                         </div>
 
                         <div>
@@ -801,9 +1017,65 @@ function PaymentSection({ team, meta }: { team: any, meta: any }) {
                             </button>
                         </div>
                     </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>
+
+            {planTermsOpen && pendingPlan === 'DOWN_PAYMENT' && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 py-6">
+                <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <p className="text-sm font-semibold uppercase tracking-widest text-brand-500">Down Payment Terms</p>
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Syarat & Ketentuan Pembayaran Sebagian</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-300 mt-1">Baca dengan teliti sebelum melanjutkan ke halaman pembayaran.</p>
+                        </div>
+                        <button
+                            type="button"
+                            className="text-gray-400 hover:text-gray-600"
+                            onClick={handleClosePlanModal}
+                            aria-label="Close terms"
+                        >
+                            &times;
+                        </button>
+                    </div>
+
+                    <div
+                        className="mt-5 space-y-4 max-h-[60vh] overflow-y-auto pr-3"
+                        ref={termsContentRef}
+                    >
+                        {downPaymentTerms.map((term) => (
+                            <div key={term} className="flex gap-3 text-sm text-gray-700 dark:text-gray-200">
+                                <span className="mt-1 h-2 w-2 rounded-full bg-brand-500"></span>
+                                <span>{term}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                        <button
+                            type="button"
+                            onClick={handleClosePlanModal}
+                            disabled={planActionLoading}
+                            className="rounded-lg border border-gray-300 px-5 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                        >
+                            Batal / Pilih opsi lain
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleAcceptDownPaymentTerms}
+                            disabled={planActionLoading}
+                            className="rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                        >
+                            {planActionLoading ? 'Menyimpan...' : 'Saya setuju & lanjutkan'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            )}
+        </>
     );
 }
 
