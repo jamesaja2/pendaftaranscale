@@ -86,26 +86,30 @@ export default function VoteClient({ eventId, initialEvent, initialTeams }: Vote
     );
   }
 
-  const boothOptions = useMemo(() => {
+  const boothOptions = React.useMemo(() => {
+    if (!teams || teams.length === 0) return [];
     const names = teams
       .map((team) => team.boothLocation?.name)
       .filter((name): name is string => Boolean(name));
     return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, "id"));
   }, [teams]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (selectedBooth && !boothOptions.includes(selectedBooth)) {
       setSelectedBooth("");
     }
   }, [boothOptions, selectedBooth]);
 
-  const filteredTeams = teams.filter((team) => {
-    const matchesSearch = searchTerm.trim()
-      ? (team.name || "").toLowerCase().includes(searchTerm.toLowerCase())
-      : true;
-    const matchesBooth = selectedBooth ? team.boothLocation?.name === selectedBooth : true;
-    return matchesSearch && matchesBooth;
-  });
+  const filteredTeams = React.useMemo(() => {
+    if (!teams) return [];
+    return teams.filter((team) => {
+      const matchesSearch = searchTerm.trim()
+        ? (team.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+        : true;
+      const matchesBooth = selectedBooth ? team.boothLocation?.name === selectedBooth : true;
+      return matchesSearch && matchesBooth;
+    });
+  }, [teams, searchTerm, selectedBooth]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
