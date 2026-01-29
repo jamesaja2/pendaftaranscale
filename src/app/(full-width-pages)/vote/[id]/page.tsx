@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import VoteClient from "./VoteClient";
 import prisma from "@/lib/prisma";
 
@@ -45,7 +44,14 @@ export default async function VotePage({ params }: VotePageProps) {
     const data = await fetchVoteData(params.id);
 
     if (!data?.event) {
-        notFound();
+        console.warn("Vote event missing or inactive", { id: params.id });
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+                <div className="max-w-md text-center p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
+                    <p className="text-gray-700 dark:text-gray-200">Event tidak ditemukan atau belum dibuka.</p>
+                </div>
+            </div>
+        );
     }
 
     const serializableEvent = {
