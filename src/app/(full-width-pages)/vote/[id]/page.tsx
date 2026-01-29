@@ -3,6 +3,7 @@ import VoteClient from "./VoteClient";
 import { getActiveVotingEvent } from "@/actions/voting";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type VotePageProps = {
     params: { id: string };
