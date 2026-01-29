@@ -168,7 +168,7 @@ export default function VoteClient({ eventId, initialEvent, initialTeams }: Vote
                   <p className="text-sm text-gray-500 mb-4">
                     {team.category} - {team.boothLocation?.name}
                   </p>
-                  <Button className="w-full justify-center" onClick={() => handleVote(team.id, team.name)} disabled={voting}>
+                  <Button className="w-full justify-center" onClick={() => handleVote(team.id, team.name || "Tenant")} disabled={voting}>
                     Vote
                   </Button>
                 </div>
