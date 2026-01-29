@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import VoteClient from "./VoteClient";
 import { getActiveVotingEvent } from "@/actions/voting";
 
+export const dynamic = "force-dynamic";
+
 type VotePageProps = {
     params: { id: string };
 };
