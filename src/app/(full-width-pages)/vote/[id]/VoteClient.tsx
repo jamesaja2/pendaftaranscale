@@ -1,41 +1,35 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { getActiveVotingEvent, castVote } from "@/actions/voting";
+import { castVote } from "@/actions/voting";
 import { useSession, signIn, signOut } from "next-auth/react";
 import Button from "@/components/ui/button/Button";
 import { useDialog } from "@/context/DialogContext";
 
 type VoteClientProps = {
   eventId: string;
+  initialEvent: {
+    id: string;
+    title: string;
+    description: string | null;
+  };
+  initialTeams: Array<{
+    id: string;
+    name: string | null;
+    category: string;
+    boothLocation: { name: string | null } | null;
+  }>;
 };
 
-export default function VoteClient({ eventId }: VoteClientProps) {
+export default function VoteClient({ eventId, initialEvent, initialTeams }: VoteClientProps) {
   const votePath = `/vote/${eventId}`;
   const { data: session, status } = useSession();
   const { showAlert, showConfirm } = useDialog();
-  const [event, setEvent] = useState<any>(null);
-  const [teams, setTeams] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const event = initialEvent;
+  const teams = initialTeams;
   const [voting, setVoting] = useState(false);
-  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBooth, setSelectedBooth] = useState("");
-
-  useEffect(() => {
-    loadData();
-  }, [eventId]);
-
-  const loadData = async () => {
-    const res = await getActiveVotingEvent(eventId);
-    if (res && res.event) {
-      setEvent(res.event);
-      setTeams(res.teams);
-    } else {
-      setError("Event not found or closed.");
-    }
-    setLoading(false);
-  };
 
   const handleVote = async (teamId: string, teamName: string) => {
     if (!session) {
@@ -56,12 +50,8 @@ export default function VoteClient({ eventId }: VoteClientProps) {
     }
   };
 
-  if (status === "loading" || loading) {
+  if (status === "loading") {
     return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white">Loading...</div>;
-  }
-
-  if (error) {
-    return <div className="min-h-screen flex items-center justify-center dark:bg-gray-900 dark:text-white text-xl">{error}</div>;
   }
 
   if (!session) {
