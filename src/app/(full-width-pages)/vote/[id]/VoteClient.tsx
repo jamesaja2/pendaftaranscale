@@ -31,6 +31,34 @@ export default function VoteClient({ eventId, initialEvent, initialTeams }: Vote
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBooth, setSelectedBooth] = useState("");
 
+  const email = session?.user?.email || "";
+  const isAllowed = email.endsWith("@smakstlouis1sby.sch.id") || email.endsWith("@s.smakstlouis1sby.sch.id");
+
+  const boothOptions = React.useMemo(() => {
+    if (!teams || teams.length === 0) return [];
+    const names = teams
+      .map((team) => team.boothLocation?.name)
+      .filter((name): name is string => Boolean(name));
+    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, "id"));
+  }, [teams]);
+
+  React.useEffect(() => {
+    if (selectedBooth && !boothOptions.includes(selectedBooth)) {
+      setSelectedBooth("");
+    }
+  }, [boothOptions, selectedBooth]);
+
+  const filteredTeams = React.useMemo(() => {
+    if (!teams) return [];
+    return teams.filter((team) => {
+      const matchesSearch = searchTerm.trim()
+        ? (team.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+        : true;
+      const matchesBooth = selectedBooth ? team.boothLocation?.name === selectedBooth : true;
+      return matchesSearch && matchesBooth;
+    });
+  }, [teams, searchTerm, selectedBooth]);
+
   const handleVote = async (teamId: string, teamName: string) => {
     if (!session) {
       signIn("google", { callbackUrl: votePath });
@@ -66,9 +94,6 @@ export default function VoteClient({ eventId, initialEvent, initialTeams }: Vote
     );
   }
 
-  const email = session.user?.email || "";
-  const isAllowed = email.endsWith("@smakstlouis1sby.sch.id") || email.endsWith("@s.smakstlouis1sby.sch.id");
-
   if (!isAllowed) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
@@ -85,31 +110,6 @@ export default function VoteClient({ eventId, initialEvent, initialTeams }: Vote
       </div>
     );
   }
-
-  const boothOptions = React.useMemo(() => {
-    if (!teams || teams.length === 0) return [];
-    const names = teams
-      .map((team) => team.boothLocation?.name)
-      .filter((name): name is string => Boolean(name));
-    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, "id"));
-  }, [teams]);
-
-  React.useEffect(() => {
-    if (selectedBooth && !boothOptions.includes(selectedBooth)) {
-      setSelectedBooth("");
-    }
-  }, [boothOptions, selectedBooth]);
-
-  const filteredTeams = React.useMemo(() => {
-    if (!teams) return [];
-    return teams.filter((team) => {
-      const matchesSearch = searchTerm.trim()
-        ? (team.name || "").toLowerCase().includes(searchTerm.toLowerCase())
-        : true;
-      const matchesBooth = selectedBooth ? team.boothLocation?.name === selectedBooth : true;
-      return matchesSearch && matchesBooth;
-    });
-  }, [teams, searchTerm, selectedBooth]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
