@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type VotePageProps = {
-    params: { id: string };
+    params: Promise<{ id: string }>;
 };
 
 async function fetchVoteData(id: string) {
@@ -61,17 +61,18 @@ async function fetchVoteData(id: string) {
 }
 
 export default async function VotePage({ params }: VotePageProps) {
-    console.log("[Vote Page] Received params:", params);
-    const data = await fetchVoteData(params.id);
+    const resolvedParams = await params;
+    console.log("[Vote Page] Received params:", resolvedParams);
+    const data = await fetchVoteData(resolvedParams.id);
 
     if (!data?.event) {
-        console.warn("Vote event missing or inactive", { id: params.id, hasData: !!data });
+        console.warn("Vote event missing or inactive", { id: resolvedParams.id, hasData: !!data });
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
                 <div className="max-w-md text-center p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
                     <p className="text-xl font-bold mb-2 text-gray-900 dark:text-white">Event Tidak Ditemukan</p>
                     <p className="text-gray-700 dark:text-gray-200">Event tidak ditemukan atau belum dibuka.</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">ID: {params.id}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">ID: {resolvedParams.id}</p>
                 </div>
             </div>
         );
@@ -94,7 +95,7 @@ export default async function VotePage({ params }: VotePageProps) {
 
     return (
         <VoteClient
-            eventId={params.id}
+            eventId={resolvedParams.id}
             initialEvent={serializableEvent}
             initialTeams={serializableTeams}
         />
