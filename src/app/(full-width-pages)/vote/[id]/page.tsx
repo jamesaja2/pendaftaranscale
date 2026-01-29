@@ -1,15 +1,14 @@
 "use client";
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useMemo, useState, use } from "react";
 import { getActiveVotingEvent, castVote } from "@/actions/voting";
 import { useSession, signIn, signOut } from "next-auth/react";
 import Button from "@/components/ui/button/Button";
-import Link from "next/link";
-import Image from "next/image";
 import { useDialog } from "@/context/DialogContext";
 
 export default function VotePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const votePath = `/vote/${id}`;
     const { data: session, status } = useSession();
     const { showAlert, showConfirm } = useDialog();
     const [event, setEvent] = useState<any>(null);
@@ -18,10 +17,11 @@ export default function VotePage({ params }: { params: Promise<{ id: string }> }
     const [voting, setVoting] = useState(false);
     const [error, setError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedBooth, setSelectedBooth] = useState("");
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [id]);
 
     const loadData = async () => {
         const res = await getActiveVotingEvent(id);
@@ -36,7 +36,7 @@ export default function VotePage({ params }: { params: Promise<{ id: string }> }
     
     const handleVote = async (teamId: string, teamName: string) => {
         if (!session) {
-            signIn("google");
+            signIn("google", { callbackUrl: votePath });
             return;
         }
         
@@ -69,7 +69,7 @@ export default function VotePage({ params }: { params: Promise<{ id: string }> }
                  <div className="max-w-md text-center">
                      <h1 className="text-3xl font-bold mb-4 dark:text-white">{event.title}</h1>
                      <p className="mb-8 text-gray-600 dark:text-gray-300">You need to sign in with your School Email to vote.</p>
-                     <Button onClick={() => signIn("google")}>Sign in with Google</Button>
+                     <Button onClick={() => signIn("google", { callbackUrl: votePath })}>Sign in with Google</Button>
                  </div>
              </div>
          )
@@ -88,14 +88,39 @@ export default function VotePage({ params }: { params: Promise<{ id: string }> }
                         Sorry, only emails from <b>@smakstlouis1sby.sch.id</b> are allowed to vote.
                      </p>
                      <p className="mt-4 text-sm text-gray-500">You are logged in as {email}</p>
+                     <Button
+                        variant="outline"
+                        className="mt-6 w-full"
+                        onClick={() => signOut({ callbackUrl: votePath })}
+                     >
+                        Logout
+                     </Button>
                  </div>
              </div>
         )
     }
 
+    const boothOptions = useMemo(() => {
+        const names = teams
+            .map((team) => team.boothLocation?.name)
+            .filter((name): name is string => Boolean(name));
+        return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, "id"));
+    }, [teams]);
+
+    useEffect(() => {
+        if (selectedBooth && !boothOptions.includes(selectedBooth)) {
+            setSelectedBooth("");
+        }
+    }, [boothOptions, selectedBooth]);
+
     const filteredTeams = teams.filter((team) => {
-        if (!searchTerm.trim()) return true;
-        return (team.name || "").toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = searchTerm.trim()
+            ? (team.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+            : true;
+        const matchesBooth = selectedBooth
+            ? team.boothLocation?.name === selectedBooth
+            : true;
+        return matchesSearch && matchesBooth;
     });
 
     return (
@@ -121,10 +146,30 @@ export default function VotePage({ params }: { params: Promise<{ id: string }> }
                             className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
                         />
                     </div>
+                    {boothOptions.length > 0 && (
+                        <div className="w-full md:max-w-xs">
+                            <label htmlFor="booth-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Pilih Booth
+                            </label>
+                            <select
+                                id="booth-filter"
+                                value={selectedBooth}
+                                onChange={(e) => setSelectedBooth(e.target.value)}
+                                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            >
+                                <option value="">Semua Booth</option>
+                                {boothOptions.map((booth) => (
+                                    <option key={booth} value={booth}>
+                                        {booth}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <Button
                         variant="outline"
                         className="w-full md:w-auto text-red-600 dark:text-red-400"
-                        onClick={() => signOut({ callbackUrl: "/" })}
+                        onClick={() => signOut({ callbackUrl: votePath })}
                     >
                         Logout
                     </Button>

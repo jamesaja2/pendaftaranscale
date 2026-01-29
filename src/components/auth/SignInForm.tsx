@@ -6,10 +6,11 @@ import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
 import React, { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [email, setEmail] = useState("");
@@ -17,6 +18,8 @@ export default function SignInForm() {
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const callbackParam = searchParams.get("callbackUrl");
+  const callbackUrl = callbackParam && callbackParam.startsWith("/") ? callbackParam : "/";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +30,7 @@ export default function SignInForm() {
       email,
       password,
       redirect: false,
+      callbackUrl,
     });
 
     setLoading(false);
@@ -34,13 +38,13 @@ export default function SignInForm() {
     if (res?.error) {
       setError("Invalid email or password");
     } else {
-      router.push("/");
+      router.push(res?.url ?? callbackUrl);
     }
   };
 
   const handleGoogleSignIn = async () => {
     setSocialLoading(true);
-    await signIn("google", { callbackUrl: "/" });
+    await signIn("google", { callbackUrl });
     setSocialLoading(false);
   };
 
