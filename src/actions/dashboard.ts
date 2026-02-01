@@ -529,11 +529,22 @@ function buildTaskPayload(formData: FormData) {
 
     let dueDate: Date | null = null;
     if (dueDateRaw) {
-        // Treat datetime-local input as UTC+7 (Asia/Jakarta)
-        const parsed = new Date(dueDateRaw);
-        if (!isNaN(parsed.getTime())) {
-            // Subtract 7 hours to convert from WIB to UTC for database storage
-            dueDate = new Date(parsed.getTime() - (7 * 60 * 60 * 1000));
+        // datetime-local format: "2025-02-18T23:59"
+        // We need to parse this as WIB (UTC+7) time, then convert to UTC for database
+        const parts = dueDateRaw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+        if (parts) {
+            const [, year, month, day, hour, minute, second] = parts;
+            // Create UTC date by treating input as WIB and subtracting 7 hours
+            const wibTime = Date.UTC(
+                parseInt(year),
+                parseInt(month) - 1,
+                parseInt(day),
+                parseInt(hour),
+                parseInt(minute),
+                parseInt(second || "0")
+            );
+            // Subtract 7 hours to convert WIB to UTC
+            dueDate = new Date(wibTime - (7 * 60 * 60 * 1000));
         }
     }
 
