@@ -121,7 +121,7 @@ export default function AdminSubmissionManager({ tasks }: { tasks: AdminSubmissi
                                         >
                                             {task.title}
                                         </button>
-                                        <p className="text-[11px] text-gray-500">Due {task.dueDate ? new Date(task.dueDate).toLocaleString() : 'No deadline'}</p>
+                                        <p className="text-[11px] text-gray-500">Due {task.dueDate ? new Date(task.dueDate).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'No deadline'}</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <button
@@ -187,7 +187,7 @@ export default function AdminSubmissionManager({ tasks }: { tasks: AdminSubmissi
                                 <p className="text-sm text-gray-500">Review {selectedTask.submissions.length} submission{selectedTask.submissions.length === 1 ? '' : 's'}</p>
                             </div>
                             <div className="text-xs text-gray-500">
-                                Deadline: {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleString() : 'No deadline'}
+                                Deadline: {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'No deadline'}
                             </div>
                         </div>
                         {selectedTask.instructions && (
@@ -343,11 +343,13 @@ function TaskFormFields({ task }: { task?: AdminSubmissionTask }) {
 function formatDatetimeLocal(value: string) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
+    // Convert UTC to UTC+7 (WIB) for display
+    const wibDate = new Date(date.getTime() + (7 * 60 * 60 * 1000));
     const pad = (n: number) => `${n}`.padStart(2, "0");
-    const year = date.getFullYear();
-    const month = pad(date.getMonth() + 1);
-    const day = pad(date.getDate());
-    const hours = pad(date.getHours());
-    const minutes = pad(date.getMinutes());
+    const year = wibDate.getUTCFullYear();
+    const month = pad(wibDate.getUTCMonth() + 1);
+    const day = pad(wibDate.getUTCDate());
+    const hours = pad(wibDate.getUTCHours());
+    const minutes = pad(wibDate.getUTCMinutes());
     return `${year}-${month}-${day}T${hours}:${minutes}`;
 }

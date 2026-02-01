@@ -61,7 +61,7 @@ function StatusBadge({ task }: { task: SubmissionTask }) {
     const submission = task.submission;
     const isSubmitted = !!submission;
     const isLate = submission ? submission.isLate : task.dueDate ? new Date() > new Date(task.dueDate) : false;
-    const dueLabel = task.dueDate ? new Date(task.dueDate).toLocaleString() : "No deadline";
+    const dueLabel = task.dueDate ? new Date(task.dueDate).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : "No deadline";
 
     return (
         <div className={`p-4 rounded border flex flex-col items-center justify-center text-center ${isSubmitted ? 'bg-green-50 border-green-200' : isLate ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
@@ -139,7 +139,7 @@ function UploadCard({ task, teamId }: { task: SubmissionTask; teamId: string }) 
         router.refresh();
     };
 
-    const dueLabel = task.dueDate ? new Date(task.dueDate).toLocaleString() : 'No deadline';
+    const dueLabel = task.dueDate ? new Date(task.dueDate).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : 'No deadline';
     const instructions = task.instructions || task.description;
 
     return (

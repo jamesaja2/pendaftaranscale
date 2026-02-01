@@ -529,9 +529,11 @@ function buildTaskPayload(formData: FormData) {
 
     let dueDate: Date | null = null;
     if (dueDateRaw) {
+        // Treat datetime-local input as UTC+7 (Asia/Jakarta)
         const parsed = new Date(dueDateRaw);
         if (!isNaN(parsed.getTime())) {
-            dueDate = parsed;
+            // Subtract 7 hours to convert from WIB to UTC for database storage
+            dueDate = new Date(parsed.getTime() - (7 * 60 * 60 * 1000));
         }
     }
 
