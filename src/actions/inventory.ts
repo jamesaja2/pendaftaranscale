@@ -8,16 +8,16 @@ import { revalidatePath } from "next/cache";
 export async function getTeamInventory(teamId?: string) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    if (!session || !session.user) {
       return { success: false, error: "Unauthorized" };
     }
 
     let targetTeamId = teamId;
 
     // If no teamId provided, get the user's team
-    if (!targetTeamId && session.user.role === "PARTICIPANT") {
+    if (!targetTeamId && (session.user as any).role === "PARTICIPANT") {
       const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { id: (session.user as any).id },
         include: { team: true },
       });
       if (!user?.team) {
@@ -32,9 +32,9 @@ export async function getTeamInventory(teamId?: string) {
     }
 
     // Check authorization
-    if (session.user.role === "PARTICIPANT") {
+    if ((session.user as any).role === "PARTICIPANT") {
       const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { id: (session.user as any).id },
         include: { team: true },
       });
       if (user?.team?.id !== targetTeamId) {
@@ -61,7 +61,7 @@ export async function getTeamInventory(teamId?: string) {
 export async function getAllInventories() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
+    if (!session || !session.user || (session.user as any).role !== "ADMIN") {
       return { success: false, error: "Unauthorized" };
     }
 
@@ -111,12 +111,12 @@ export async function addInventoryItem(data: {
 }) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "PARTICIPANT") {
+    if (!session || !session.user || (session.user as any).role !== "PARTICIPANT") {
       return { success: false, error: "Unauthorized" };
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: (session.user as any).id },
       include: { team: true },
     });
 
@@ -173,12 +173,12 @@ export async function updateInventoryItem(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "PARTICIPANT") {
+    if (!session || !session.user || (session.user as any).role !== "PARTICIPANT") {
       return { success: false, error: "Unauthorized" };
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: (session.user as any).id },
       include: { team: true },
     });
 
@@ -227,12 +227,12 @@ export async function updateInventoryItem(
 export async function deleteInventoryItem(itemId: string) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "PARTICIPANT") {
+    if (!session || !session.user || (session.user as any).role !== "PARTICIPANT") {
       return { success: false, error: "Unauthorized" };
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: (session.user as any).id },
       include: { team: true },
     });
 
@@ -264,12 +264,12 @@ export async function deleteInventoryItem(itemId: string) {
 export async function submitInventory() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "PARTICIPANT") {
+    if (!session || !session.user || (session.user as any).role !== "PARTICIPANT") {
       return { success: false, error: "Unauthorized" };
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: (session.user as any).id },
       include: { team: true },
     });
 

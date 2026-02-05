@@ -11,13 +11,7 @@ export const metadata: Metadata = {
 export default function AdminInventoryPage() {
   return (
     <>
-      <PageBreadcrumb
-        pageName="Inventaris Tim"
-        items={[
-          { name: "Dashboard", path: "/" },
-          { name: "Inventaris Tim", path: "/inventory" },
-        ]}
-      />
+      <PageBreadcrumb pageTitle="Inventaris Tim" />
 
       <div className="rounded-lg border border-stroke bg-white p-6 shadow-sm dark:border-dark-3 dark:bg-gray-dark">
         <AdminInventoryView />

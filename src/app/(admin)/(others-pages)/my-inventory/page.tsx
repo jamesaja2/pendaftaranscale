@@ -138,13 +138,7 @@ export default function ParticipantInventoryPage() {
 
   return (
     <>
-      <PageBreadcrumb
-        pageName="Inventaris Barang"
-        items={[
-          { name: "Dashboard", path: "/" },
-          { name: "Inventaris", path: "/my-inventory" },
-        ]}
-      />
+      <PageBreadcrumb pageTitle="Inventaris Barang" />
 
       <div className="space-y-6">
         {/* Info Banner */}
