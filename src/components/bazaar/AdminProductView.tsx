@@ -1,28 +1,18 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { getAllInventories } from "@/actions/inventory";
+import { getAllProducts } from "@/actions/product";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import Image from "next/image";
 
-type ItemCategory = "ELEKTRONIK" | "PERALATAN" | "FURNITURE" | "DEKORASI" | "LAINNYA";
-
-interface InventoryItem {
+interface Product {
   id: string;
   name: string;
-  category: ItemCategory;
-  quantity: number;
-  unit?: string | null;
+  variant?: string | null;
   description?: string | null;
-  watt?: number | null;
-  ampere?: number | null;
-  voltage?: number | null;
-  brand?: string | null;
-  material?: string | null;
-  dimensions?: string | null;
-  weight?: number | null;
-  condition?: string | null;
-  notes?: string | null;
+  imageUrl?: string | null;
+  stock?: number | null;
 }
 
 interface Team {
@@ -30,8 +20,8 @@ interface Team {
   name: string | null;
   leaderName: string | null;
   boothLocationId: string | null;
-  inventoryItems: InventoryItem[];
-  inventorySubmission: {
+  products: Product[];
+  productSubmission: {
     submittedAt: Date;
     updatedAt: Date;
   } | null;
@@ -41,34 +31,23 @@ interface Team {
   };
 }
 
-export default function AdminInventoryView() {
+export default function AdminProductView() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    loadInventories();
+    loadProducts();
   }, []);
 
-  const loadInventories = async () => {
+  const loadProducts = async () => {
     setLoading(true);
-    const result = await getAllInventories();
+    const result = await getAllProducts();
     if (result.success && result.teams) {
       setTeams(result.teams);
     }
     setLoading(false);
-  };
-
-  const getCategoryLabel = (category: ItemCategory) => {
-    const labels: Record<ItemCategory, string> = {
-      ELEKTRONIK: "Elektronik",
-      PERALATAN: "Peralatan",
-      FURNITURE: "Furniture",
-      DEKORASI: "Dekorasi",
-      LAINNYA: "Lainnya",
-    };
-    return labels[category];
   };
 
   const downloadPDF = async (team: Team) => {
@@ -101,7 +80,7 @@ export default function AdminInventoryView() {
     // H1 Title - 24px, uppercase
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    const titleText = 'DAFTAR INVENTARIS';
+    const titleText = 'KATALOG PRODUK';
     const titleWidth = doc.getTextWidth(titleText);
     doc.text(titleText, (pageWidth - titleWidth) / 2, 35);
     
@@ -113,7 +92,7 @@ export default function AdminInventoryView() {
     // === INFO SECTION (Grid 2x2) ===
     const infoY = 52;
     const boxHeight = 15;
-    const boxWidth = (pageWidth - 50) / 2; // 2 kolom dengan gap
+    const boxWidth = (pageWidth - 50) / 2;
     const gap = 10;
     const col1X = 20;
     const col2X = col1X + boxWidth + gap;
@@ -151,65 +130,50 @@ export default function AdminInventoryView() {
     
     // Row 2
     drawInfoBox(col1X, infoY + boxHeight + gap, 'Penanggung Jawab:', team.leaderName || '-');
-    drawInfoBox(col2X, infoY + boxHeight + gap, 'Total Item:', `${team.inventoryItems.length} Item`);
+    drawInfoBox(col2X, infoY + boxHeight + gap, 'Total Produk:', `${team.products.length} Produk`);
 
     // === TABLE (matching print.html structure) ===
-    const tableData = team.inventoryItems.map((item, idx) => {
-      const specs = [];
-      if (item.category === "ELEKTRONIK") {
-        if (item.watt) specs.push(`${item.watt}W`);
-        if (item.ampere) specs.push(`${item.ampere}A`);
-        if (item.voltage) specs.push(`${item.voltage}V`);
-        if (item.brand) specs.push(item.brand);
-      } else if (item.material) {
-        specs.push(item.material);
-      }
-      if (item.dimensions) specs.push(item.dimensions);
-
-      return [
-        (idx + 1).toString(),
-        `INV-${String(idx + 1).padStart(3, '0')}`,
-        item.name,
-        getCategoryLabel(item.category),
-        `${item.quantity} ${item.unit || "pcs"}`,
-        item.condition || "Baik",
-        specs.join(", ") || "-",
-      ];
-    });
+    const tableData = team.products.map((product, idx) => [
+      (idx + 1).toString(),
+      `PRD-${String(idx + 1).padStart(3, '0')}`,
+      product.name,
+      product.variant || "-",
+      product.description || "-",
+      product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited",
+    ]);
 
     autoTable(doc, {
       startY: infoY + 2 * boxHeight + 2 * gap + 10,
-      head: [["No", "Kode", "Nama Barang", "Kategori", "Jumlah", "Kondisi", "Lokasi"]],
+      head: [["No", "Kode", "Nama Produk", "Varian", "Deskripsi", "Stok"]],
       body: tableData,
       styles: { 
-          fontSize: 10, // smaller untuk fit
-          font: 'helvetica',
-          cellPadding: { top: 2, right: 1.5, bottom: 2, left: 1.5 },
-          textColor: [51, 51, 51],
-          lineColor: [221, 221, 221],
-          lineWidth: 0.1
-        },
-        headStyles: { 
-          fillColor: [51, 51, 51], // #333
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: 10,
-          halign: 'left',
-          cellPadding: { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 }
-        },
-        alternateRowStyles: {
-          fillColor: [250, 250, 250] // #fafafa
-        },
-        columnStyles: {
-          0: { cellWidth: 10, halign: 'center' }, // No
-          1: { cellWidth: 20 }, // Kode
-          2: { cellWidth: 50 }, // Nama - reduced
-          3: { cellWidth: 25 }, // Kategori
-          4: { cellWidth: 18, halign: 'center' }, // Jumlah
-          5: { cellWidth: 20 }, // Kondisi
-          6: { cellWidth: 27 } // Lokasi
-        }
-      });
+        fontSize: 9, // smaller untuk fit
+        font: 'helvetica',
+        cellPadding: { top: 2, right: 1.5, bottom: 2, left: 1.5 },
+        textColor: [51, 51, 51],
+        lineColor: [221, 221, 221],
+        lineWidth: 0.1
+      },
+      headStyles: { 
+        fillColor: [51, 51, 51], // #333
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 9,
+        halign: 'left',
+        cellPadding: { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 }
+      },
+      alternateRowStyles: {
+        fillColor: [250, 250, 250] // #fafafa
+      },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' }, // No
+        1: { cellWidth: 20 }, // Kode
+        2: { cellWidth: 45 }, // Nama - reduced
+        3: { cellWidth: 30 }, // Varian - reduced
+        4: { cellWidth: 50 }, // Deskripsi - reduced
+        5: { cellWidth: 15, halign: 'center' } // Stok
+      }
+    });
 
     // === FOOTER - SIGNATURE BOXES (3 columns) ===
     const finalY = (doc as any).lastAutoTable.finalY + 20;
@@ -247,13 +211,13 @@ export default function AdminInventoryView() {
     });
 
     // === LABELS PAGE (same style) ===
-    if (team.inventoryItems.length > 0) {
+    if (team.products.length > 0) {
       doc.addPage();
       
       // Header for labels
       doc.setFontSize(24);
       doc.setFont('helvetica', 'bold');
-      const labelTitle = 'LABEL INVENTARIS';
+      const labelTitle = 'LABEL PRODUK';
       const labelTitleWidth = doc.getTextWidth(labelTitle);
       doc.text(labelTitle, (pageWidth - labelTitleWidth) / 2, 30);
       
@@ -266,7 +230,7 @@ export default function AdminInventoryView() {
       const labelWidth = pageWidth - 40;
       const margin = 20;
       
-      team.inventoryItems.forEach((item, index) => {
+      team.products.forEach((product, index) => {
         if (yPos + labelHeight > doc.internal.pageSize.getHeight() - 20) {
           doc.addPage();
           yPos = 20;
@@ -285,23 +249,27 @@ export default function AdminInventoryView() {
         doc.setLineWidth(0.3);
         doc.rect(margin, yPos, labelWidth, labelHeight, 'S');
         
-        // Item code (top right)
+        // Product code (top right)
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
-        const code = `INV-${String(index + 1).padStart(3, '0')}`;
+        const code = `PRD-${String(index + 1).padStart(3, '0')}`;
         doc.text(code, pageWidth - margin - 5, yPos + 7, { align: 'right' });
         
-        // Item number and name
+        // Product number and name
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
-        doc.text(`${index + 1}. ${item.name}`, margin + 8, yPos + 12);
+        doc.text(`${index + 1}. ${product.name}`, margin + 8, yPos + 12);
         
-        // Category and quantity
+        // Variant and stock
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Kategori: ${getCategoryLabel(item.category)}`, margin + 8, yPos + 22);
-        doc.text(`Jumlah: ${item.quantity} ${item.unit || "pcs"}`, margin + 8, yPos + 29);
-        doc.text(`Kondisi: ${item.condition || "Baik"}`, margin + 8, yPos + 36);
+        if (product.variant) {
+          doc.text(`Varian: ${product.variant}`, margin + 8, yPos + 22);
+        }
+        const stockText = product.stock !== null && product.stock !== undefined 
+          ? `Stok: ${product.stock}` 
+          : 'Stok: Unlimited';
+        doc.text(stockText, margin + 8, product.variant ? yPos + 29 : yPos + 22);
         
         // Team name (bottom right, smaller)
         doc.setFontSize(10);
@@ -314,14 +282,14 @@ export default function AdminInventoryView() {
       });
     }
 
-    doc.save(`Inventaris_${team.name || team.id}.pdf`);
+    doc.save(`Katalog_Produk_${team.name || team.id}.pdf`);
   };
 
   const downloadAllPDF = async () => {
     const doc = new jsPDF();
     doc.setFont('helvetica');
     const pageWidth = doc.internal.pageSize.getWidth();
-    let allItems: Array<{item: InventoryItem, teamName: string, itemIndex: number}> = [];
+    let allProducts: Array<{product: Product, teamName: string, productIndex: number}> = [];
     let globalIndex = 0;
     
     // Load logo once
@@ -354,7 +322,7 @@ export default function AdminInventoryView() {
       // H1 Title - 24px, uppercase
       doc.setFontSize(24);
       doc.setFont('helvetica', 'bold');
-      const titleText = 'DAFTAR INVENTARIS';
+      const titleText = 'KATALOG PRODUK';
       const titleWidth = doc.getTextWidth(titleText);
       doc.text(titleText, (pageWidth - titleWidth) / 2, 35);
       
@@ -404,38 +372,25 @@ export default function AdminInventoryView() {
       
       // Row 2
       drawInfoBox(col1X, infoY + boxHeight + gap, 'Penanggung Jawab:', team.leaderName || '-');
-      drawInfoBox(col2X, infoY + boxHeight + gap, 'Total Item:', `${team.inventoryItems.length} Item`);
+      drawInfoBox(col2X, infoY + boxHeight + gap, 'Total Produk:', `${team.products.length} Produk`);
 
       // === TABLE (matching print.html structure) ===
-      const tableData = team.inventoryItems.map((item, idx) => {
-        allItems.push({ item, teamName: team.name || "Tim", itemIndex: globalIndex });
+      const tableData = team.products.map((product, idx) => {
+        allProducts.push({ product, teamName: team.name || "Tim", productIndex: globalIndex });
         globalIndex++;
         
-        const specs = [];
-        if (item.category === "ELEKTRONIK") {
-          if (item.watt) specs.push(`${item.watt}W`);
-          if (item.ampere) specs.push(`${item.ampere}A`);
-          if (item.voltage) specs.push(`${item.voltage}V`);
-          if (item.brand) specs.push(item.brand);
-        } else if (item.material) {
-          specs.push(item.material);
-        }
-        if (item.dimensions) specs.push(item.dimensions);
-
         return [
           (idx + 1).toString(),
-          `INV-${String(globalIndex).padStart(3, '0')}`,
-          item.name,
-          getCategoryLabel(item.category),
-          `${item.quantity} ${item.unit || "pcs"}`,
-          item.condition || "Baik",
-          specs.join(", ") || "-",
+          `PRD-${String(globalIndex).padStart(3, '0')}`,
+          product.name,
+          product.variant || "-",
+          product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited",
         ];
       });
 
       autoTable(doc, {
         startY: infoY + 2 * boxHeight + 2 * gap + 10,
-        head: [["No", "Kode", "Nama Barang", "Kategori", "Jumlah", "Kondisi", "Lokasi"]],
+        head: [["No", "Kode", "Nama Produk", "Varian", "Stok"]],
         body: tableData,
         styles: { 
           fontSize: 10,
@@ -458,12 +413,10 @@ export default function AdminInventoryView() {
         },
         columnStyles: {
           0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 20 },
-          2: { cellWidth: 50 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 18, halign: 'center' },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 27 }
+          1: { cellWidth: 22 },
+          2: { cellWidth: 75 },
+          3: { cellWidth: 40 },
+          4: { cellWidth: 23, halign: 'center' }
         }
       });
       
@@ -504,13 +457,13 @@ export default function AdminInventoryView() {
     });
 
     // === LABELS PAGE (same style) ===
-    if (allItems.length > 0) {
+    if (allProducts.length > 0) {
       doc.addPage();
       
       // Header for labels
       doc.setFontSize(24);
       doc.setFont('helvetica', 'bold');
-      const labelTitle = 'LABEL INVENTARIS';
+      const labelTitle = 'LABEL PRODUK';
       const labelTitleWidth = doc.getTextWidth(labelTitle);
       doc.text(labelTitle, (pageWidth - labelTitleWidth) / 2, 30);
       
@@ -523,7 +476,7 @@ export default function AdminInventoryView() {
       const labelWidth = pageWidth - 40;
       const margin = 20;
       
-      allItems.forEach((entry) => {
+      allProducts.forEach((entry) => {
         if (yPos + labelHeight > doc.internal.pageSize.getHeight() - 20) {
           doc.addPage();
           yPos = 20;
@@ -542,23 +495,27 @@ export default function AdminInventoryView() {
         doc.setLineWidth(0.3);
         doc.rect(margin, yPos, labelWidth, labelHeight, 'S');
         
-        // Item code (top right)
+        // Product code (top right)
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
-        const code = `INV-${String(entry.itemIndex + 1).padStart(3, '0')}`;
+        const code = `PRD-${String(entry.productIndex + 1).padStart(3, '0')}`;
         doc.text(code, pageWidth - margin - 5, yPos + 7, { align: 'right' });
         
-        // Item name
+        // Product name
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
-        doc.text(entry.item.name, margin + 8, yPos + 12);
+        doc.text(entry.product.name, margin + 8, yPos + 12);
         
-        // Category and quantity
+        // Variant and stock
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Kategori: ${getCategoryLabel(entry.item.category)}`, margin + 8, yPos + 22);
-        doc.text(`Jumlah: ${entry.item.quantity} ${entry.item.unit || "pcs"}`, margin + 8, yPos + 29);
-        doc.text(`Kondisi: ${entry.item.condition || "Baik"}`, margin + 8, yPos + 36);
+        if (entry.product.variant) {
+          doc.text(`Varian: ${entry.product.variant}`, margin + 8, yPos + 22);
+        }
+        const stockText = entry.product.stock !== null && entry.product.stock !== undefined 
+          ? `Stok: ${entry.product.stock}` 
+          : 'Stok: Unlimited';
+        doc.text(stockText, margin + 8, entry.product.variant ? yPos + 29 : yPos + 22);
         
         // Team name (bottom right, smaller)
         doc.setFontSize(10);
@@ -571,7 +528,7 @@ export default function AdminInventoryView() {
       });
     }
 
-    doc.save("Inventaris_Semua_Tim.pdf");
+    doc.save("Katalog_Produk_Semua_Tim.pdf");
   };
 
   const filteredTeams = teams.filter((team) => {
@@ -622,64 +579,71 @@ export default function AdminInventoryView() {
             </p>
             {selectedTeam.boothLocationId && (
               <p className="text-dark dark:text-white">
-                <span className="font-medium">Lokasi Booth:</span>{" "}
-                {selectedTeam.boothLocationId}
+                <span className="font-medium">Lokasi Booth:</span> {selectedTeam.boothLocationId}
               </p>
             )}
-            {selectedTeam.inventorySubmission && (
+            {selectedTeam.productSubmission && (
               <p className="text-dark dark:text-white">
                 <span className="font-medium">Terakhir Update:</span>{" "}
-                {new Date(selectedTeam.inventorySubmission.updatedAt).toLocaleString("id-ID")}
+                {new Date(selectedTeam.productSubmission.updatedAt).toLocaleString("id-ID")}
               </p>
             )}
           </div>
 
           <h3 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-            Daftar Item ({selectedTeam.inventoryItems.length})
+            Daftar Produk ({selectedTeam.products.length})
           </h3>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {selectedTeam.inventoryItems.map((item) => (
+            {selectedTeam.products.map((product) => (
               <div
-                key={item.id}
-                className="rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2"
+                key={product.id}
+                className="rounded-lg border border-stroke bg-gray-50 dark:border-dark-3 dark:bg-dark-2"
               >
-                <h4 className="mb-2 text-lg font-semibold text-dark dark:text-white">
-                  {item.name}
-                </h4>
-                <span className="mb-3 inline-block rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                  {getCategoryLabel(item.category)}
-                </span>
-                <div className="mt-3 space-y-1 text-sm text-dark dark:text-white">
-                  <p>
-                    <span className="font-medium">Jumlah:</span> {item.quantity}{" "}
-                    {item.unit || "pcs"}
-                  </p>
-                  {item.condition && (
-                    <p>
-                      <span className="font-medium">Kondisi:</span> {item.condition}
+                {product.imageUrl ? (
+                  <div className="relative h-40 w-full overflow-hidden rounded-t-lg">
+                    <Image
+                      src={product.imageUrl}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-40 items-center justify-center rounded-t-lg bg-gray-200 dark:bg-dark-3">
+                    <svg
+                      className="h-12 w-12 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                )}
+                <div className="p-4">
+                  <h4 className="mb-2 text-lg font-semibold text-dark dark:text-white">
+                    {product.name}
+                  </h4>
+                  {product.variant && (
+                    <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">
+                      Varian: {product.variant}
                     </p>
                   )}
-                  {item.category === "ELEKTRONIK" && (
-                    <>
-                      {item.watt && <p>Watt: {item.watt}W</p>}
-                      {item.ampere && <p>Ampere: {item.ampere}A</p>}
-                      {item.voltage && <p>Voltage: {item.voltage}V</p>}
-                      {item.brand && <p>Brand: {item.brand}</p>}
-                    </>
-                  )}
-                  {item.material && <p>Material: {item.material}</p>}
-                  {item.dimensions && <p>Dimensi: {item.dimensions}</p>}
-                  {item.weight && <p>Berat: {item.weight}kg</p>}
-                  {item.description && (
-                    <p className="mt-2 text-gray-600 dark:text-gray-400">
-                      {item.description}
+                  {product.description && (
+                    <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
+                      {product.description}
                     </p>
                   )}
-                  {item.notes && (
-                    <p className="mt-2 rounded bg-yellow-100 p-2 text-xs dark:bg-yellow-900/20">
-                      <span className="font-medium">Catatan:</span> {item.notes}
-                    </p>
+                  {product.stock !== null && product.stock !== undefined && (
+                    <span className="inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+                      Stok: {product.stock}
+                    </span>
                   )}
                 </div>
               </div>
@@ -695,10 +659,10 @@ export default function AdminInventoryView() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-dark dark:text-white">
-            Inventaris Tim ({teams.length})
+            Katalog Produk Tim ({teams.length})
           </h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Daftar tim yang sudah submit inventaris
+            Daftar tim yang sudah submit katalog produk
           </p>
         </div>
         <button
@@ -723,7 +687,7 @@ export default function AdminInventoryView() {
       {filteredTeams.length === 0 ? (
         <div className="rounded-lg border border-stroke bg-white p-8 text-center dark:border-dark-3 dark:bg-gray-dark">
           <p className="text-gray-500 dark:text-gray-400">
-            {searchQuery ? "Tidak ada hasil yang cocok" : "Belum ada tim yang submit inventaris"}
+            {searchQuery ? "Tidak ada hasil yang cocok" : "Belum ada tim yang submit katalog produk"}
           </p>
         </div>
       ) : (
@@ -742,12 +706,11 @@ export default function AdminInventoryView() {
                 </p>
                 <p className="text-gray-600 dark:text-gray-400">Email: {team.user.email}</p>
                 <p className="font-medium text-primary">
-                  {team.inventoryItems.length} item inventaris
+                  {team.products.length} produk
                 </p>
-                {team.inventorySubmission && (
+                {team.productSubmission && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Update:{" "}
-                    {new Date(team.inventorySubmission.updatedAt).toLocaleDateString("id-ID")}
+                    Update: {new Date(team.productSubmission.updatedAt).toLocaleDateString("id-ID")}
                   </p>
                 )}
               </div>
@@ -756,7 +719,7 @@ export default function AdminInventoryView() {
                   onClick={() => setSelectedTeam(team)}
                   className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary/90"
                 >
-                  Lihat Detail
+                  Lihat Katalog
                 </button>
                 <button
                   onClick={() => downloadPDF(team)}

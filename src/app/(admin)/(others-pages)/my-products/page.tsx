@@ -1,87 +1,65 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { getTeamInventory, submitInventory } from "@/actions/inventory";
-import InventoryList from "@/components/bazaar/InventoryList";
+import { getTeamProducts, submitProducts } from "@/actions/product";
+import ProductList from "@/components/bazaar/ProductList";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-type ItemCategory = "ELEKTRONIK" | "PERALATAN" | "FURNITURE" | "DEKORASI" | "LAINNYA";
-
-interface InventoryItem {
+interface Product {
   id: string;
   name: string;
-  category: ItemCategory;
-  quantity: number;
-  unit?: string | null;
+  variant?: string | null;
   description?: string | null;
-  watt?: number | null;
-  ampere?: number | null;
-  voltage?: number | null;
-  brand?: string | null;
-  material?: string | null;
-  dimensions?: string | null;
-  weight?: number | null;
-  condition?: string | null;
-  notes?: string | null;
+  imageUrl?: string | null;
+  stock?: number | null;
 }
 
-interface InventorySubmission {
+interface ProductSubmission {
   submittedAt: Date;
   updatedAt: Date;
 }
 
-export default function ParticipantInventoryPage() {
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [submission, setSubmission] = useState<InventorySubmission | null>(null);
+export default function ParticipantProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [submission, setSubmission] = useState<ProductSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    loadInventory();
+    loadProducts();
   }, []);
 
-  const loadInventory = async () => {
+  const loadProducts = async () => {
     setLoading(true);
-    const result = await getTeamInventory();
+    const result = await getTeamProducts();
     if (result.success) {
-      setItems(result.items || []);
+      setProducts(result.products || []);
       setSubmission(result.submission || null);
     }
     setLoading(false);
   };
 
   const handleSubmit = async () => {
-    if (items.length === 0) {
-      alert("Tambahkan minimal 1 item sebelum submit");
+    if (products.length === 0) {
+      alert("Tambahkan minimal 1 produk sebelum submit");
       return;
     }
 
-    if (!confirm("Apakah Anda yakin ingin submit inventaris? Anda masih bisa mengedit setelah submit.")) {
+    if (!confirm("Apakah Anda yakin ingin submit katalog produk? Anda masih bisa mengedit setelah submit.")) {
       return;
     }
 
     setIsSubmitting(true);
-    const result = await submitInventory();
+    const result = await submitProducts();
     if (result.success) {
-      alert("Inventaris berhasil disubmit!");
-      loadInventory();
+      alert("Katalog produk berhasil disubmit!");
+      loadProducts();
     } else {
-      alert(result.error || "Gagal submit inventaris");
+      alert(result.error || "Gagal submit katalog produk");
     }
     setIsSubmitting(false);
-  };
-
-  const getCategoryLabel = (category: ItemCategory) => {
-    const labels: Record<ItemCategory, string> = {
-      ELEKTRONIK: "Elektronik",
-      PERALATAN: "Peralatan",
-      FURNITURE: "Furniture",
-      DEKORASI: "Dekorasi",
-      LAINNYA: "Lainnya",
-    };
-    return labels[category];
   };
 
   const downloadPDF = () => {
@@ -89,43 +67,31 @@ export default function ParticipantInventoryPage() {
 
     // Title
     doc.setFontSize(18);
-    doc.text("Daftar Inventaris Bazaar", 14, 20);
+    doc.text("Katalog Produk Bazaar", 14, 20);
 
     doc.setFontSize(12);
     doc.text("Tim Anda", 14, 30);
 
     // Table
-    const tableData = items.map((item) => {
-      const details = [];
-      if (item.category === "ELEKTRONIK") {
-        if (item.watt) details.push(`${item.watt}W`);
-        if (item.ampere) details.push(`${item.ampere}A`);
-        if (item.voltage) details.push(`${item.voltage}V`);
-        if (item.brand) details.push(item.brand);
-      } else if (item.material) {
-        details.push(item.material);
-      }
-      if (item.dimensions) details.push(item.dimensions);
-
-      return [
-        item.name,
-        getCategoryLabel(item.category),
-        `${item.quantity} ${item.unit || "pcs"}`,
-        item.condition || "-",
-        details.join(", ") || "-",
-        item.notes || "-",
-      ];
-    });
+    const tableData = products.map((product) => [
+      product.name,
+      product.variant || "-",
+      product.description || "-",
+      product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited",
+    ]);
 
     autoTable(doc, {
       startY: 40,
-      head: [["Nama Barang", "Kategori", "Jumlah", "Kondisi", "Spesifikasi", "Catatan"]],
+      head: [["Nama Produk", "Varian", "Deskripsi", "Stok"]],
       body: tableData,
-      styles: { fontSize: 8 },
+      styles: { fontSize: 9 },
       headStyles: { fillColor: [59, 130, 246] },
+      columnStyles: {
+        2: { cellWidth: 60 }, // Description column wider
+      },
     });
 
-    doc.save("Inventaris_Tim.pdf");
+    doc.save("Katalog_Produk_Tim.pdf");
   };
 
   if (loading) {
@@ -138,19 +104,20 @@ export default function ParticipantInventoryPage() {
 
   return (
     <>
-      <PageBreadcrumb pageTitle="Inventaris Barang" />
+      <PageBreadcrumb pageTitle="Katalog Produk" />
 
       <div className="space-y-6">
         {/* Info Banner */}
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
           <h3 className="mb-2 font-semibold text-blue-900 dark:text-blue-300">
-            ℹ️ Informasi Inventaris
+            ℹ️ Informasi Katalog Produk
           </h3>
           <ul className="space-y-1 text-sm text-blue-800 dark:text-blue-400">
-            <li>• Input semua barang yang akan dibawa saat hari-H bazaar</li>
-            <li>• Anda dapat mengedit inventaris kapan saja, bahkan setelah submit</li>
-            <li>• Download PDF untuk dokumentasi dan keperluan panitia</li>
-            <li>• Pastikan informasi spesifikasi barang akurat, terutama untuk barang elektronik</li>
+            <li>• Input semua produk yang akan dijual saat bazaar</li>
+            <li>• Anda dapat mengedit katalog kapan saja, bahkan setelah submit</li>
+            <li>• Upload gambar produk untuk menarik pembeli</li>
+            <li>• Tambahkan deskripsi yang menarik untuk setiap produk</li>
+            <li>• Download PDF untuk dokumentasi dan promosi</li>
           </ul>
         </div>
 
@@ -160,7 +127,7 @@ export default function ParticipantInventoryPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold text-green-900 dark:text-green-300">
-                  ✓ Inventaris sudah disubmit
+                  ✓ Katalog produk sudah disubmit
                 </p>
                 <p className="mt-1 text-sm text-green-700 dark:text-green-400">
                   Terakhir update:{" "}
@@ -172,7 +139,7 @@ export default function ParticipantInventoryPage() {
               </div>
               <button
                 onClick={downloadPDF}
-                disabled={items.length === 0}
+                disabled={products.length === 0}
                 className="rounded-lg bg-green-600 px-6 py-2 text-white transition hover:bg-green-700 disabled:opacity-50"
               >
                 Download PDF
@@ -184,30 +151,30 @@ export default function ParticipantInventoryPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold text-yellow-900 dark:text-yellow-300">
-                  ⚠️ Belum submit inventaris
+                  ⚠️ Belum submit katalog produk
                 </p>
                 <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-400">
-                  Tambahkan item lalu klik tombol submit di bawah
+                  Tambahkan produk lalu klik tombol submit di bawah
                 </p>
               </div>
               <button
                 onClick={handleSubmit}
-                disabled={isSubmitting || items.length === 0}
+                disabled={isSubmitting || products.length === 0}
                 className="rounded-lg bg-blue-600 px-6 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
               >
-                {isSubmitting ? "Submitting..." : "Submit Inventaris"}
+                {isSubmitting ? "Submitting..." : "Submit Katalog"}
               </button>
             </div>
           </div>
         )}
 
-        {/* Inventory List */}
+        {/* Product List */}
         <div className="rounded-lg border border-stroke bg-white p-6 shadow-sm dark:border-dark-3 dark:bg-gray-dark">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-bold text-dark dark:text-white">
-              Daftar Item ({items.length})
+              Daftar Produk ({products.length})
             </h2>
-            {submission && items.length > 0 && (
+            {submission && products.length > 0 && (
               <button
                 onClick={downloadPDF}
                 className="rounded-lg bg-blue-500 px-4 py-2 text-sm text-white transition hover:bg-blue-600"
@@ -216,18 +183,18 @@ export default function ParticipantInventoryPage() {
               </button>
             )}
           </div>
-          <InventoryList items={items} onRefresh={loadInventory} editable={true} />
+          <ProductList products={products} onRefresh={loadProducts} editable={true} />
         </div>
 
         {/* Submit Button at Bottom */}
-        {!submission && items.length > 0 && (
+        {!submission && products.length > 0 && (
           <div className="flex justify-end">
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
               className="rounded-lg bg-blue-600 px-8 py-3 text-lg font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
-              {isSubmitting ? "Submitting..." : "Submit Inventaris"}
+              {isSubmitting ? "Submitting..." : "Submit Katalog Produk"}
             </button>
           </div>
         )}

@@ -46,6 +46,11 @@ const participantItems: NavItem[] = [
     name: "Inventaris Barang",
     path: "/my-inventory",
   },
+  {
+    icon: <GridIcon />,
+    name: "Katalog Produk",
+    path: "/my-products",
+  },
 ];
 
 const participantVotingItem: NavItem = {
@@ -113,6 +118,11 @@ const othersItems: NavItem[] = [
     icon: <BoxCubeIcon />,
     name: "Inventaris Tim",
     path: "/inventory",
+  },
+  {
+    icon: <GridIcon />,
+    name: "Katalog Produk Tim",
+    path: "/products",
   }
 ];
 

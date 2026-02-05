@@ -180,6 +180,8 @@ model Team {
   submissions     Submission[]
   inventoryItems  InventoryItem[]
   inventorySubmission InventorySubmission?
+  products        Product[]
+  productSubmission ProductSubmission?
 }
 
 model Ingredient {
@@ -285,6 +287,32 @@ model InventoryItem {
 }
 
 model InventorySubmission {
+  id          String   @id @default(cuid())
+  teamId      String   @unique
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  teamId      String
+  name        String
+  variant     String?
+  description String?  @db.Text
+  imageUrl    String?
+  stock       Int?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  
+  @@index([teamId])
+}
+
+model ProductSubmission {
   id          String   @id @default(cuid())
   teamId      String   @unique
   submittedAt DateTime @default(now())
