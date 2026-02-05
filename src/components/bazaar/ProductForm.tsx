@@ -31,7 +31,7 @@ export default function ProductForm({ product, onSuccess, onCancel }: ProductFor
   const [imageUrl, setImageUrl] = useState(product?.imageUrl || "");
   const [stock, setStock] = useState(product?.stock?.toString() || "");
 
-  const { uploadFile, uploading, progress } = useUploadWithProgress();
+  const { uploadFile, isUploading, progress } = useUploadWithProgress();
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,7 +55,7 @@ export default function ProductForm({ product, onSuccess, onCancel }: ProductFor
     if (result.success && result.url) {
       setImageUrl(result.url);
     } else {
-      setError(result.error || "Gagal upload gambar");
+      setError("Gagal upload gambar");
     }
   };
 
@@ -190,11 +190,11 @@ export default function ProductForm({ product, onSuccess, onCancel }: ProductFor
             type="file"
             accept="image/*"
             onChange={handleImageUpload}
-            disabled={uploading}
+            disabled={isUploading}
             className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-dark outline-none transition focus:border-primary dark:border-dark-3 dark:text-white"
           />
           
-          {uploading && (
+          {isUploading && (
             <div className="mt-2">
               <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-3">
                 <div
@@ -218,7 +218,7 @@ export default function ProductForm({ product, onSuccess, onCancel }: ProductFor
       <div className="flex gap-3">
         <button
           type="submit"
-          disabled={isSubmitting || uploading}
+          disabled={isSubmitting || isUploading}
           className="flex-1 rounded-lg bg-primary px-6 py-3 text-white transition hover:bg-primary/90 disabled:opacity-50"
         >
           {isSubmitting ? "Menyimpan..." : product ? "Update Produk" : "Tambah Produk"}
