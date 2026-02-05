@@ -41,6 +41,11 @@ const participantItems: NavItem[] = [
     name: "Submissions",
     path: "/submissions",
   },
+  {
+    icon: <BoxCubeIcon />,
+    name: "Inventaris Barang",
+    path: "/my-inventory",
+  },
 ];
 
 const participantVotingItem: NavItem = {
@@ -103,6 +108,11 @@ const othersItems: NavItem[] = [
     icon: <ListIcon />,
     name: "Voting Events",
     path: "/voting",
+  },
+  {
+    icon: <BoxCubeIcon />,
+    name: "Inventaris Tim",
+    path: "/inventory",
   }
 ];
 

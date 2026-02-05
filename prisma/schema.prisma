@@ -177,7 +177,9 @@ model Team {
   updatedAt       DateTime @updatedAt
   
   votes           Vote[]
-    submissions     Submission[]
+  submissions     Submission[]
+  inventoryItems  InventoryItem[]
+  inventorySubmission InventorySubmission?
 }
 
 model Ingredient {
@@ -240,5 +242,54 @@ model Submission {
   task        SubmissionTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, taskId])
+}
+
+enum ItemCategory {
+  ELEKTRONIK
+  PERALATAN
+  FURNITURE
+  DEKORASI
+  LAINNYA
+}
+
+model InventoryItem {
+  id          String       @id @default(cuid())
+  teamId      String
+  name        String
+  category    ItemCategory
+  quantity    Int          @default(1)
+  unit        String?      // pcs, buah, set, dll
+  description String?      @db.Text
+  
+  // Elektronik specific
+  watt        Float?
+  ampere      Float?
+  voltage     Float?
+  brand       String?
+  
+  // Peralatan specific
+  material    String?
+  dimensions  String?      // e.g., "50cm x 30cm x 20cm"
+  weight      Float?       // in kg
+  
+  // General
+  condition   String?      // Baru, Bekas Baik, dll
+  notes       String?      @db.Text
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  team        Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  
+  @@index([teamId])
+}
+
+model InventorySubmission {
+  id          String   @id @default(cuid())
+  teamId      String   @unique
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
 }
 

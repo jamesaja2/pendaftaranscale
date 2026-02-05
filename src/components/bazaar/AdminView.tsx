@@ -9,6 +9,7 @@ const formatCurrencyIdr = (value?: number | null) => {
 
 export default function AdminView({ teams, settings }: { teams: any[], settings: any[] }) {
     const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+    const [selectedTeamData, setSelectedTeamData] = useState<any | null>(null);
     const [viewTeam, setViewTeam] = useState<any | null>(null);
     const [activeTab, setActiveTab] = useState<'teams' | 'cms'>('teams');
 
@@ -109,7 +110,7 @@ export default function AdminView({ teams, settings }: { teams: any[], settings:
                                         {(team.paymentStatus !== 'VERIFIED') && (
                                              <button onClick={() => verifyTeam(team.id)} className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400 font-medium">Verify</button>
                                         )}
-                                        <button onClick={() => setSelectedTeam(team.id)} className="text-indigo-600 hover:text-indigo-900 dark:hover:text-indigo-400 font-medium">Set POS</button>
+                                        <button onClick={() => { setSelectedTeam(team.id); setSelectedTeamData(team); }} className="text-indigo-600 hover:text-indigo-900 dark:hover:text-indigo-400 font-medium">Set POS</button>
                                     </td>
                                 </tr>
                             ))}
@@ -229,22 +230,51 @@ export default function AdminView({ teams, settings }: { teams: any[], settings:
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-md shadow-xl">
                         <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Set POS Credentials</h2>
-                         {/* Display Team Name */}
-                         <p className="text-sm text-gray-500 mb-4">For Team ID: {selectedTeam}</p>
+                         <p className="text-sm text-gray-500 mb-2">Team: {selectedTeamData?.name || selectedTeamData?.leaderName}</p>
+                         {selectedTeamData?.posUsername && (
+                             <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                                 <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-2">Current Credentials:</p>
+                                 <div className="grid grid-cols-2 gap-3 text-sm">
+                                     <div>
+                                         <span className="text-xs text-gray-500 dark:text-gray-400">Username:</span>
+                                         <p className="font-mono font-bold text-gray-900 dark:text-white">{selectedTeamData.posUsername}</p>
+                                     </div>
+                                     <div>
+                                         <span className="text-xs text-gray-500 dark:text-gray-400">Password:</span>
+                                         <p className="font-mono font-bold text-gray-900 dark:text-white">{selectedTeamData.posPassword}</p>
+                                     </div>
+                                 </div>
+                             </div>
+                         )}
                         <form action={async (formData) => {
                             await setPosCredentials(selectedTeam, formData);
                             setSelectedTeam(null);
+                            setSelectedTeamData(null);
                         }}>
                              <div className="mb-4">
                                  <label className="block text-sm font-medium mb-1 dark:text-gray-300">Username</label>
-                                 <input type="text" name="username" placeholder="POS Username" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
+                                 <input 
+                                     type="text" 
+                                     name="username" 
+                                     defaultValue={selectedTeamData?.posUsername || ''}
+                                     placeholder="POS Username" 
+                                     className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                                     required 
+                                 />
                              </div>
                              <div className="mb-6">
                                  <label className="block text-sm font-medium mb-1 dark:text-gray-300">Password</label>
-                                 <input type="text" name="password" placeholder="POS Password" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
+                                 <input 
+                                     type="text" 
+                                     name="password" 
+                                     defaultValue={selectedTeamData?.posPassword || ''}
+                                     placeholder="POS Password" 
+                                     className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                                     required 
+                                 />
                              </div>
                              <div className="flex justify-end gap-3">
-                                 <button type="button" onClick={() => setSelectedTeam(null)} className="px-4 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Cancel</button>
+                                 <button type="button" onClick={() => { setSelectedTeam(null); setSelectedTeamData(null); }} className="px-4 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Cancel</button>
                                  <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow">Save Credentials</button>
                              </div>
                         </form>
