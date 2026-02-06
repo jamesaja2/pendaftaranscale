@@ -10,10 +10,27 @@ import autoTable from "jspdf-autotable";
 interface Product {
   id: string;
   name: string;
-  variant?: string | null;
-  description?: string | null;
-  imageUrl?: string | null;
-  stock?: number | null;
+  description: string | null;
+  imageUrl: string | null;
+  price: number;
+  stock: number | null;
+  isAvailable: boolean;
+  category: string | null;
+  variants?: Array<{
+    id?: string;
+    name: string;
+    additionalPrice: number;
+    isRequired: boolean;
+    isAvailable: boolean;
+    order: number;
+  }>;
+  addons?: Array<{
+    id?: string;
+    name: string;
+    price: number;
+    isAvailable: boolean;
+    order: number;
+  }>;
 }
 
 interface ProductSubmission {
@@ -73,21 +90,33 @@ export default function ParticipantProductsPage() {
     doc.text("Tim Anda", 14, 30);
 
     // Table
-    const tableData = products.map((product) => [
-      product.name,
-      product.variant || "-",
-      product.description || "-",
-      product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited",
-    ]);
+    const tableData = products.map((product) => {
+      const variantCount = product.variants?.length || 0;
+      const addonCount = product.addons?.length || 0;
+      const variantText = variantCount > 0 ? `${variantCount} varian` : "-";
+      const addonText = addonCount > 0 ? `${addonCount} add-on` : "-";
+      const priceText = `Rp ${product.price?.toLocaleString('id-ID') || 0}`;
+      
+      return [
+        product.name,
+        priceText,
+        variantText,
+        addonText,
+        product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited",
+      ];
+    });
 
     autoTable(doc, {
       startY: 40,
-      head: [["Nama Produk", "Varian", "Deskripsi", "Stok"]],
+      head: [["Nama Produk", "Harga", "Varian", "Add-on", "Stok"]],
       body: tableData,
       styles: { fontSize: 9 },
       headStyles: { fillColor: [59, 130, 246] },
       columnStyles: {
-        2: { cellWidth: 60 }, // Description column wider
+        1: { halign: 'right' }, // Price align right
+        2: { halign: 'center' }, // Variant count center
+        3: { halign: 'center' }, // Addon count center
+        4: { halign: 'center' }, // Stock center
       },
     });
 

@@ -8,10 +8,27 @@ import Image from "next/image";
 interface Product {
   id: string;
   name: string;
-  variant?: string | null;
-  description?: string | null;
-  imageUrl?: string | null;
-  stock?: number | null;
+  description: string | null;
+  imageUrl: string | null;
+  price: number;
+  stock: number | null;
+  isAvailable: boolean;
+  category: string | null;
+  variants?: Array<{
+    id?: string;
+    name: string;
+    additionalPrice: number;
+    isRequired: boolean;
+    isAvailable: boolean;
+    order: number;
+  }>;
+  addons?: Array<{
+    id?: string;
+    name: string;
+    price: number;
+    isAvailable: boolean;
+    order: number;
+  }>;
 }
 
 interface ProductListProps {
@@ -130,25 +147,56 @@ export default function ProductList({ products, onRefresh, editable = true }: Pr
                   {product.name}
                 </h4>
                 
-                {product.variant && (
-                  <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
-                    Varian: {product.variant}
-                  </p>
+                {/* Price */}
+                <p className="mb-2 text-xl font-bold text-blue-600 dark:text-blue-400">
+                  Rp {product.price?.toLocaleString('id-ID') || 0}
+                </p>
+                
+                {/* Category */}
+                {product.category && (
+                  <span className="mb-2 inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                    {product.category}
+                  </span>
                 )}
 
+                {/* Variants and Addons count */}
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {product.variants && product.variants.length > 0 && (
+                    <span className="inline-block rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-600 dark:bg-green-900/20 dark:text-green-400">
+                      {product.variants.length} varian
+                    </span>
+                  )}
+                  {product.addons && product.addons.length > 0 && (
+                    <span className="inline-block rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-600 dark:bg-purple-900/20 dark:text-purple-400">
+                      {product.addons.length} add-on
+                    </span>
+                  )}
+                </div>
+
+                {/* Description */}
                 {product.description && (
                   <p className="mb-3 line-clamp-2 text-sm text-gray-600 dark:text-gray-400">
                     {product.description}
                   </p>
                 )}
 
-                {product.stock !== null && product.stock !== undefined && (
-                  <div className="mb-3">
+                {/* Stock and availability */}
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {product.stock !== null && product.stock !== undefined ? (
                     <span className="inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
                       Stok: {product.stock}
                     </span>
-                  </div>
-                )}
+                  ) : (
+                    <span className="inline-block rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-600 dark:bg-green-900/20 dark:text-green-400">
+                      Unlimited
+                    </span>
+                  )}
+                  {!product.isAvailable && (
+                    <span className="inline-block rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                      Tidak Tersedia
+                    </span>
+                  )}
+                </div>
 
                 {editable && (
                   <div className="flex gap-2">

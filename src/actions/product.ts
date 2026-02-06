@@ -44,6 +44,14 @@ export async function getTeamProducts(teamId?: string) {
 
     const products = await prisma.product.findMany({
       where: { teamId: targetTeamId },
+      include: {
+        variants: {
+          orderBy: { order: 'asc' },
+        },
+        addons: {
+          orderBy: { order: 'asc' },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
 
@@ -73,6 +81,14 @@ export async function getAllProducts() {
       },
       include: {
         products: {
+          include: {
+            variants: {
+              orderBy: { order: 'asc' },
+            },
+            addons: {
+              orderBy: { order: 'asc' },
+            },
+          },
           orderBy: { createdAt: "desc" },
         },
         productSubmission: true,
@@ -95,10 +111,25 @@ export async function getAllProducts() {
 
 export async function addProduct(data: {
   name: string;
-  variant?: string;
   description?: string;
   imageUrl?: string;
-  stock?: number;
+  price: number;
+  stock?: number | null;
+  isAvailable: boolean;
+  category?: string;
+  variants?: Array<{
+    name: string;
+    additionalPrice: number;
+    isRequired: boolean;
+    isAvailable: boolean;
+    order: number;
+  }>;
+  addons?: Array<{
+    name: string;
+    price: number;
+    isAvailable: boolean;
+    order: number;
+  }>;
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -119,10 +150,37 @@ export async function addProduct(data: {
       data: {
         teamId: user.team.id,
         name: data.name,
-        variant: data.variant,
         description: data.description,
         imageUrl: data.imageUrl,
+        price: data.price,
         stock: data.stock,
+        isAvailable: data.isAvailable,
+        category: data.category,
+        variants: data.variants
+          ? {
+              create: data.variants.map((v) => ({
+                name: v.name,
+                additionalPrice: v.additionalPrice,
+                isRequired: v.isRequired,
+                isAvailable: v.isAvailable,
+                order: v.order,
+              })),
+            }
+          : undefined,
+        addons: data.addons
+          ? {
+              create: data.addons.map((a) => ({
+                name: a.name,
+                price: a.price,
+                isAvailable: a.isAvailable,
+                order: a.order,
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        variants: true,
+        addons: true,
       },
     });
 
@@ -138,10 +196,27 @@ export async function updateProduct(
   productId: string,
   data: {
     name?: string;
-    variant?: string;
     description?: string;
     imageUrl?: string;
-    stock?: number;
+    price?: number;
+    stock?: number | null;
+    isAvailable?: boolean;
+    category?: string;
+    variants?: Array<{
+      id?: string;
+      name: string;
+      additionalPrice: number;
+      isRequired: boolean;
+      isAvailable: boolean;
+      order: number;
+    }>;
+    addons?: Array<{
+      id?: string;
+      name: string;
+      price: number;
+      isAvailable: boolean;
+      order: number;
+    }>;
   }
 ) {
   try {
@@ -170,14 +245,57 @@ export async function updateProduct(
 
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
-    if (data.variant !== undefined) updateData.variant = data.variant;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl;
+    if (data.price !== undefined) updateData.price = data.price;
     if (data.stock !== undefined) updateData.stock = data.stock;
+    if (data.isAvailable !== undefined) updateData.isAvailable = data.isAvailable;
+    if (data.category !== undefined) updateData.category = data.category;
+
+    // Handle variants using transaction for proper deletion and recreation
+    if (data.variants !== undefined) {
+      // Delete existing variants
+      await prisma.productVariant.deleteMany({
+        where: { productId },
+      });
+
+      // Create new variants
+      updateData.variants = {
+        create: data.variants.map((v) => ({
+          name: v.name,
+          additionalPrice: v.additionalPrice,
+          isRequired: v.isRequired,
+          isAvailable: v.isAvailable,
+          order: v.order,
+        })),
+      };
+    }
+
+    // Handle addons
+    if (data.addons !== undefined) {
+      // Delete existing addons
+      await prisma.productAddon.deleteMany({
+        where: { productId },
+      });
+
+      // Create new addons
+      updateData.addons = {
+        create: data.addons.map((a) => ({
+          name: a.name,
+          price: a.price,
+          isAvailable: a.isAvailable,
+          order: a.order,
+        })),
+      };
+    }
 
     const updatedProduct = await prisma.product.update({
       where: { id: productId },
       data: updateData,
+      include: {
+        variants: true,
+        addons: true,
+      },
     });
 
     revalidatePath("/products");

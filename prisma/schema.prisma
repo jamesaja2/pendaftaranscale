@@ -299,17 +299,60 @@ model Product {
   id          String   @id @default(cuid())
   teamId      String
   name        String
-  variant     String?
   description String?  @db.Text
   imageUrl    String?
-  stock       Int?
+  
+  // Pricing
+  price       Float    @default(0) // Base price
+  
+  // Stock Management
+  stock       Int?     // null = unlimited
+  isAvailable Boolean  @default(true)
+  
+  // Category
+  category    String?  // Makanan, Minuman, Snack, dll
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
-  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team        Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  variants    ProductVariant[]
+  addons      ProductAddon[]
   
   @@index([teamId])
+}
+
+model ProductVariant {
+  id              String   @id @default(cuid())
+  productId       String
+  name            String   // e.g., "Small", "Medium", "Large" or "Pedas", "Original"
+  additionalPrice Float    @default(0) // Harga tambahan dari base price
+  isRequired      Boolean  @default(false) // Apakah harus dipilih (radio) atau optional (checkbox)
+  order           Int      @default(0) // Urutan tampilan
+  isAvailable     Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@index([productId])
+}
+
+model ProductAddon {
+  id          String   @id @default(cuid())
+  productId   String
+  name        String   // e.g., "Extra Cheese", "Extra Pedas", "Es Batu"
+  price       Float    @default(0) // Harga addon
+  isAvailable Boolean  @default(true)
+  order       Int      @default(0) // Urutan tampilan
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@index([productId])
 }
 
 model ProductSubmission {
