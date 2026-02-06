@@ -340,7 +340,7 @@ export default function ProductForm({ product, onSuccess, onCancel }: ProductFor
           <button
             type="button"
             onClick={addVariant}
-            className="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary/90"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
             + Tambah Varian
           </button>
@@ -423,7 +423,7 @@ export default function ProductForm({ product, onSuccess, onCancel }: ProductFor
           <button
             type="button"
             onClick={addAddon}
-            className="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary/90"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
             + Tambah Add-on
           </button>
@@ -494,7 +494,7 @@ export default function ProductForm({ product, onSuccess, onCancel }: ProductFor
         <button
           type="submit"
           disabled={isSubmitting || isUploading}
-          className="flex-1 rounded-lg bg-primary px-6 py-3 text-white transition hover:bg-primary/90 disabled:opacity-50"
+          className="flex-1 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
         >
           {isSubmitting ? "Menyimpan..." : product ? "Update Produk" : "Tambah Produk"}
         </button>
