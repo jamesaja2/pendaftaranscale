@@ -32,9 +32,17 @@ interface InventorySubmission {
   updatedAt: Date;
 }
 
+interface Team {
+  id: string;
+  name: string | null;
+  leaderName: string | null;
+  boothLocationId: string | null;
+}
+
 export default function ParticipantInventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [submission, setSubmission] = useState<InventorySubmission | null>(null);
+  const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -48,6 +56,7 @@ export default function ParticipantInventoryPage() {
     if (result.success) {
       setItems(result.items || []);
       setSubmission(result.submission || null);
+      setTeam(result.team || null);
     }
     setLoading(false);
   };
@@ -84,48 +93,230 @@ export default function ParticipantInventoryPage() {
     return labels[category];
   };
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
+    if (!team) return;
+    
     const doc = new jsPDF();
+    doc.setFont('helvetica');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // === HEADER DENGAN LOGO ===
+    try {
+      const logoUrl = 'https://ppsntr.nichdant.com/files/resources--inventaris.png';
+      const response = await fetch(logoUrl);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      
+      await new Promise((resolve) => {
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          const logoWidth = 50;
+          doc.addImage(base64data, 'PNG', (pageWidth - logoWidth) / 2, 8, logoWidth, 0);
+          resolve(null);
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Failed to load logo:', error);
+    }
+    
+    // H1 Title - 24px, uppercase
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    const titleText = 'DAFTAR INVENTARIS';
+    const titleWidth = doc.getTextWidth(titleText);
+    doc.text(titleText, (pageWidth - titleWidth) / 2, 35);
+    
+    // Border bottom - 3px solid #333
+    doc.setDrawColor(51, 51, 51);
+    doc.setLineWidth(0.8);
+    doc.line(20, 42, pageWidth - 20, 42);
+    
+    // === INFO SECTION (Grid 2x2) ===
+    const infoY = 52;
+    const boxHeight = 15;
+    const boxWidth = (pageWidth - 50) / 2;
+    const gap = 10;
+    const col1X = 20;
+    const col2X = col1X + boxWidth + gap;
+    
+    const drawInfoBox = (x: number, y: number, label: string, value: string) => {
+      doc.setFillColor(249, 249, 249);
+      doc.rect(x, y, boxWidth, boxHeight, 'F');
+      
+      doc.setDrawColor(51, 51, 51);
+      doc.setFillColor(51, 51, 51);
+      doc.rect(x, y, 1, boxHeight, 'F');
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(85, 85, 85);
+      doc.text(label, x + 4, y + 6);
+      
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 51, 51);
+      doc.text(value, x + 4, y + 12);
+      doc.setTextColor(0, 0, 0);
+    };
+    
+    drawInfoBox(col1X, infoY, 'Nama Tim:', team.name || '-');
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+    drawInfoBox(col2X, infoY, 'Tanggal Cetak:', dateStr);
+    
+    drawInfoBox(col1X, infoY + boxHeight + gap, 'Penanggung Jawab:', team.leaderName || '-');
+    drawInfoBox(col2X, infoY + boxHeight + gap, 'Total Item:', `${items.length} Item`);
 
-    // Title
-    doc.setFontSize(18);
-    doc.text("Daftar Inventaris Bazaar", 14, 20);
-
-    doc.setFontSize(12);
-    doc.text("Tim Anda", 14, 30);
-
-    // Table
-    const tableData = items.map((item) => {
-      const details = [];
+    // === TABLE ===
+    const tableData = items.map((item, idx) => {
+      const specs = [];
       if (item.category === "ELEKTRONIK") {
-        if (item.watt) details.push(`${item.watt}W`);
-        if (item.ampere) details.push(`${item.ampere}A`);
-        if (item.voltage) details.push(`${item.voltage}V`);
-        if (item.brand) details.push(item.brand);
+        if (item.watt) specs.push(`${item.watt}W`);
+        if (item.ampere) specs.push(`${item.ampere}A`);
+        if (item.voltage) specs.push(`${item.voltage}V`);
+        if (item.brand) specs.push(item.brand);
       } else if (item.material) {
-        details.push(item.material);
+        specs.push(item.material);
       }
-      if (item.dimensions) details.push(item.dimensions);
+      if (item.dimensions) specs.push(item.dimensions);
 
       return [
+        (idx + 1).toString(),
+        `INV-${String(idx + 1).padStart(3, '0')}`,
         item.name,
         getCategoryLabel(item.category),
         `${item.quantity} ${item.unit || "pcs"}`,
-        item.condition || "-",
-        details.join(", ") || "-",
-        item.notes || "-",
+        item.condition || "Baik",
+        specs.join(", ") || "-",
       ];
     });
 
     autoTable(doc, {
-      startY: 40,
-      head: [["Nama Barang", "Kategori", "Jumlah", "Kondisi", "Spesifikasi", "Catatan"]],
+      startY: infoY + 2 * boxHeight + 2 * gap + 10,
+      head: [["No", "Kode", "Nama Barang", "Kategori", "Jumlah", "Kondisi", "Lokasi"]],
       body: tableData,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [59, 130, 246] },
+      styles: { 
+        fontSize: 10,
+        font: 'helvetica',
+        cellPadding: { top: 2, right: 1.5, bottom: 2, left: 1.5 },
+        textColor: [51, 51, 51],
+        lineColor: [221, 221, 221],
+        lineWidth: 0.1
+      },
+      headStyles: { 
+        fillColor: [51, 51, 51],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 10,
+        halign: 'left',
+        cellPadding: { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 }
+      },
+      alternateRowStyles: {
+        fillColor: [250, 250, 250]
+      },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 50 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 18, halign: 'center' },
+        5: { cellWidth: 20 },
+        6: { cellWidth: 27 }
+      }
     });
 
-    doc.save("Inventaris_Tim.pdf");
+    // === FOOTER - SIGNATURE BOXES ===
+    const finalY = (doc as any).lastAutoTable.finalY + 20;
+    const signBoxWidth = 55;
+    const signBoxGap = ((pageWidth - 40) - (3 * signBoxWidth)) / 2;
+    
+    const signatures = [
+      { label: 'Dibuat Oleh,', x: 20 },
+      { label: 'Diperiksa Oleh,', x: 20 + signBoxWidth + signBoxGap },
+      { label: 'Disetujui Oleh,', x: 20 + 2 * (signBoxWidth + signBoxGap) }
+    ];
+    
+    signatures.forEach(sig => {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      const labelWidth = doc.getTextWidth(sig.label);
+      doc.text(sig.label, sig.x + (signBoxWidth - labelWidth) / 2, finalY);
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      const nameText = '( _____________ )';
+      const nameWidth = doc.getTextWidth(nameText);
+      
+      const lineY = finalY + 21;
+      const lineStartX = sig.x + (signBoxWidth - 40) / 2;
+      doc.setLineWidth(0.3);
+      doc.line(lineStartX, lineY, lineStartX + 40, lineY);
+      
+      doc.text(nameText, sig.x + (signBoxWidth - nameWidth) / 2, lineY + 4);
+    });
+
+    // === LABELS PAGE ===
+    if (items.length > 0) {
+      doc.addPage();
+      
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      const labelTitle = 'LABEL INVENTARIS';
+      const labelTitleWidth = doc.getTextWidth(labelTitle);
+      doc.text(labelTitle, (pageWidth - labelTitleWidth) / 2, 30);
+      
+      doc.setDrawColor(51, 51, 51);
+      doc.setLineWidth(0.8);
+      doc.line(20, 38, pageWidth - 20, 38);
+      
+      let yPos = 50;
+      const labelHeight = 45;
+      const labelWidth = pageWidth - 40;
+      const margin = 20;
+      
+      items.forEach((item, index) => {
+        if (yPos + labelHeight > doc.internal.pageSize.getHeight() - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+        
+        doc.setFillColor(249, 249, 249);
+        doc.rect(margin, yPos, labelWidth, labelHeight, 'F');
+        
+        doc.setFillColor(51, 51, 51);
+        doc.rect(margin, yPos, 1, labelHeight, 'F');
+        
+        doc.setDrawColor(51, 51, 51);
+        doc.setLineWidth(0.3);
+        doc.rect(margin, yPos, labelWidth, labelHeight, 'S');
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        const code = `INV-${String(index + 1).padStart(3, '0')}`;
+        doc.text(code, pageWidth - margin - 5, yPos + 7, { align: 'right' });
+        
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${index + 1}. ${item.name}`, margin + 8, yPos + 12);
+        
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Kategori: ${getCategoryLabel(item.category)}`, margin + 8, yPos + 22);
+        doc.text(`Jumlah: ${item.quantity} ${item.unit || "pcs"}`, margin + 8, yPos + 29);
+        doc.text(`Kondisi: ${item.condition || "Baik"}`, margin + 8, yPos + 36);
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(102, 102, 102);
+        doc.text(`Tim: ${team.name || "Tim"}`, pageWidth - margin - 5, yPos + labelHeight - 3, { align: 'right' });
+        doc.setTextColor(0, 0, 0);
+        
+        yPos += labelHeight + 10;
+      });
+    }
+
+    doc.save(`Inventaris_${team.name || 'Tim'}.pdf`);
   };
 
   if (loading) {

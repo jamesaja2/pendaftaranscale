@@ -683,52 +683,77 @@ export default function AdminProductView() {
 
   if (selectedTeam) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => setSelectedTeam(null)}
-            className="rounded-lg border border-stroke px-4 py-2 transition hover:bg-gray-50 dark:border-dark-3 dark:hover:bg-dark-3"
-          >
-            ← Kembali
-          </button>
-          <button
-            onClick={() => downloadPDF(selectedTeam)}
-            className="rounded-lg bg-blue-500 px-6 py-2 text-white transition hover:bg-blue-600"
-          >
-            Download PDF
-          </button>
-        </div>
+      <>
+        {/* Backdrop */}
+        <div 
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          onClick={() => setSelectedTeam(null)}
+        />
+        
+        {/* Modal */}
+        <div className="fixed inset-4 z-50 overflow-auto md:inset-8 lg:inset-16">
+          <div className="mx-auto max-w-6xl">
+            <div className="rounded-lg border border-stroke bg-white shadow-2xl dark:border-dark-3 dark:bg-gray-dark">
+              {/* Header */}
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stroke bg-white px-6 py-4 dark:border-dark-3 dark:bg-gray-dark">
+                <h2 className="text-2xl font-bold text-dark dark:text-white">
+                  {selectedTeam.name || "Tim"}
+                </h2>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => downloadPDF(selectedTeam)}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                  >
+                    📄 Download PDF
+                  </button>
+                  <button
+                    onClick={() => setSelectedTeam(null)}
+                    className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium transition hover:bg-gray-50 dark:border-dark-3 dark:hover:bg-dark-3"
+                  >
+                    ✕ Tutup
+                  </button>
+                </div>
+              </div>
 
-        <div className="rounded-lg border border-stroke bg-white p-6 shadow-sm dark:border-dark-3 dark:bg-gray-dark">
-          <h2 className="mb-4 text-2xl font-bold text-dark dark:text-white">
-            {selectedTeam.name || "Tim"}
-          </h2>
-          <div className="mb-6 space-y-2 text-sm">
-            <p className="text-dark dark:text-white">
-              <span className="font-medium">Ketua:</span> {selectedTeam.leaderName || "-"}
-            </p>
-            <p className="text-dark dark:text-white">
-              <span className="font-medium">Email:</span> {selectedTeam.user.email}
-            </p>
-            {selectedTeam.boothLocationId && (
-              <p className="text-dark dark:text-white">
-                <span className="font-medium">Lokasi Booth:</span> {selectedTeam.boothLocationId}
-              </p>
-            )}
-            {selectedTeam.productSubmission && (
-              <p className="text-dark dark:text-white">
-                <span className="font-medium">Terakhir Update:</span>{" "}
-                {new Date(selectedTeam.productSubmission.updatedAt).toLocaleString("id-ID")}
-              </p>
-            )}
-          </div>
+              {/* Content */}
+              <div className="p-6">
+                <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Ketua Tim</p>
+                    <p className="mt-1 text-base font-semibold text-dark dark:text-white">
+                      {selectedTeam.leaderName || "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Email</p>
+                    <p className="mt-1 text-base font-semibold text-dark dark:text-white">
+                      {selectedTeam.user.email}
+                    </p>
+                  </div>
+                  {selectedTeam.boothLocationId && (
+                    <div className="rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Lokasi Booth</p>
+                      <p className="mt-1 text-base font-semibold text-dark dark:text-white">
+                        {selectedTeam.boothLocationId}
+                      </p>
+                    </div>
+                  )}
+                  {selectedTeam.productSubmission && (
+                    <div className="rounded-lg border border-stroke bg-gray-50 p-4 dark:border-dark-3 dark:bg-dark-2">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Terakhir Update</p>
+                      <p className="mt-1 text-sm font-semibold text-dark dark:text-white">
+                        {new Date(selectedTeam.productSubmission.updatedAt).toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                  )}
+                </div>
 
-          <h3 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-            Daftar Produk ({selectedTeam.products.length})
-          </h3>
+                <h3 className="mb-4 text-xl font-semibold text-dark dark:text-white">
+                  Daftar Produk ({selectedTeam.products.length})
+                </h3>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {selectedTeam.products.map((product) => (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {selectedTeam.products.map((product) => (
               <div
                 key={product.id}
                 className="rounded-lg border border-stroke bg-gray-50 dark:border-dark-3 dark:bg-dark-2"
@@ -776,25 +801,53 @@ export default function AdminProductView() {
                     </span>
                   )}
                   
-                  {/* Variants and Addons count */}
-                  <div className="mb-2 flex gap-2">
-                    {(product as any).variants && (product as any).variants.length > 0 && (
-                      <span className="inline-block rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-600 dark:bg-green-900/20 dark:text-green-400">
-                        {(product as any).variants.length} varian
-                      </span>
-                    )}
-                    {(product as any).addons && (product as any).addons.length > 0 && (
-                      <span className="inline-block rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-600 dark:bg-purple-900/20 dark:text-purple-400">
-                        {(product as any).addons.length} add-on
-                      </span>
-                    )}
-                  </div>
-                  
                   {/* Description */}
                   {product.description && (
-                    <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
+                    <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
                       {product.description}
                     </p>
+                  )}
+                  
+                  {/* Variants Detail */}
+                  {(product as any).variants && (product as any).variants.length > 0 && (
+                    <div className="mb-3 rounded-lg border border-green-100 bg-green-50/50 p-3 dark:border-green-900/30 dark:bg-green-900/10">
+                      <p className="mb-2 text-xs font-semibold text-green-700 dark:text-green-400">
+                        Varian ({(product as any).variants.length})
+                      </p>
+                      <div className="space-y-1">
+                        {(product as any).variants.map((v: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between text-xs">
+                            <span className="text-dark dark:text-white">
+                              • {v.name} {v.isRequired && <span className="text-red-500">*</span>}
+                            </span>
+                            {v.additionalPrice > 0 && (
+                              <span className="font-medium text-green-600 dark:text-green-400">
+                                +Rp {v.additionalPrice.toLocaleString('id-ID')}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Addons Detail */}
+                  {(product as any).addons && (product as any).addons.length > 0 && (
+                    <div className="mb-3 rounded-lg border border-purple-100 bg-purple-50/50 p-3 dark:border-purple-900/30 dark:bg-purple-900/10">
+                      <p className="mb-2 text-xs font-semibold text-purple-700 dark:text-purple-400">
+                        Add-on ({(product as any).addons.length})
+                      </p>
+                      <div className="space-y-1">
+                        {(product as any).addons.map((a: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between text-xs">
+                            <span className="text-dark dark:text-white">• {a.name}</span>
+                            <span className="font-medium text-purple-600 dark:text-purple-400">
+                              +Rp {a.price.toLocaleString('id-ID')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   
                   {/* Stock and availability */}
@@ -820,10 +873,13 @@ export default function AdminProductView() {
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  </div>
+  </>
+  );
+}
 
-  return (
+return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -886,15 +942,15 @@ export default function AdminProductView() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setSelectedTeam(team)}
-                  className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm text-white transition hover:bg-primary/90"
+                  className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
                 >
-                  Lihat Katalog
+                  👁️ Lihat Detail
                 </button>
                 <button
                   onClick={() => downloadPDF(team)}
-                  className="rounded-lg bg-blue-500 px-4 py-2 text-sm text-white transition hover:bg-blue-600"
+                  className="rounded-lg border border-stroke bg-white px-4 py-2 text-sm font-medium text-dark transition hover:bg-gray-50 dark:border-dark-3 dark:bg-dark-2 dark:text-white dark:hover:bg-dark-3"
                 >
-                  PDF
+                  📄 PDF
                 </button>
               </div>
             </div>

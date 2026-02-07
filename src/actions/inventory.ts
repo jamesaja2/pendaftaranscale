@@ -51,7 +51,17 @@ export async function getTeamInventory(teamId?: string) {
       where: { teamId: targetTeamId },
     });
 
-    return { success: true, items, submission };
+    const team = await prisma.team.findUnique({
+      where: { id: targetTeamId },
+      select: {
+        id: true,
+        name: true,
+        leaderName: true,
+        boothLocationId: true,
+      },
+    });
+
+    return { success: true, items, submission, team };
   } catch (error) {
     console.error("Error fetching inventory:", error);
     return { success: false, error: "Failed to fetch inventory" };
