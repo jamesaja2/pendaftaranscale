@@ -79,45 +79,164 @@ export default function ParticipantProductsPage() {
     setIsSubmitting(false);
   };
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
     const doc = new jsPDF();
+    doc.setFont('helvetica');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // === HEADER DENGAN LOGO ===
+    try {
+      const logoUrl = 'https://ppsntr.nichdant.com/files/resources--inventaris.png';
+      const response = await fetch(logoUrl);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      
+      await new Promise((resolve) => {
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          const logoWidth = 50;
+          doc.addImage(base64data, 'PNG', (pageWidth - logoWidth) / 2, 8, logoWidth, 0);
+          resolve(null);
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Failed to load logo:', error);
+    }
+    
+    // H1 Title
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    const titleText = 'KATALOG PRODUK';
+    const titleWidth = doc.getTextWidth(titleText);
+    doc.text(titleText, (pageWidth - titleWidth) / 2, 35);
+    
+    // Border bottom
+    doc.setDrawColor(51, 51, 51);
+    doc.setLineWidth(0.8);
+    doc.line(20, 42, pageWidth - 20, 42);
+    
+    // === INFO SECTION ===
+    const infoY = 52;
+    const boxHeight = 15;
+    const boxWidth = (pageWidth - 50) / 2;
+    const gap = 10;
+    const col1X = 20;
+    const col2X = col1X + boxWidth + gap;
+    
+    const drawInfoBox = (x: number, y: number, label: string, value: string) => {
+      doc.setFillColor(249, 249, 249);
+      doc.rect(x, y, boxWidth, boxHeight, 'F');
+      doc.setDrawColor(51, 51, 51);
+      doc.setFillColor(51, 51, 51);
+      doc.rect(x, y, 1, boxHeight, 'F');
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(85, 85, 85);
+      doc.text(label, x + 4, y + 6);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 51, 51);
+      doc.text(value, x + 4, y + 12);
+      doc.setTextColor(0, 0, 0);
+    };
+    
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+    
+    drawInfoBox(col1X, infoY, 'Tim Anda:', 'Tim Peserta');
+    drawInfoBox(col2X, infoY, 'Tanggal Cetak:', dateStr);
+    drawInfoBox(col1X, infoY + boxHeight + gap, 'Total Produk:', `${products.length} Produk`);
+    drawInfoBox(col2X, infoY + boxHeight + gap, 'Status:', submission ? 'Sudah Submit' : 'Draft');
 
-    // Title
-    doc.setFontSize(18);
-    doc.text("Katalog Produk Bazaar", 14, 20);
-
-    doc.setFontSize(12);
-    doc.text("Tim Anda", 14, 30);
-
-    // Table
-    const tableData = products.map((product) => {
-      const variantCount = product.variants?.length || 0;
-      const addonCount = product.addons?.length || 0;
-      const variantText = variantCount > 0 ? `${variantCount} varian` : "-";
-      const addonText = addonCount > 0 ? `${addonCount} add-on` : "-";
+    // === TABLE ===
+    const tableData = products.map((product, idx) => {
+      // Build variant & addon details
+      let productDetails = product.name;
+      if (product.variants && product.variants.length > 0) {
+        productDetails += '\n  Varian:';
+        product.variants.forEach((v) => {
+          const priceStr = v.additionalPrice > 0 ? ` (+Rp ${v.additionalPrice.toLocaleString('id-ID')})` : '';
+          productDetails += `\n  • ${v.name}${priceStr}`;
+        });
+      }
+      if (product.addons && product.addons.length > 0) {
+        productDetails += '\n  Add-on:';
+        product.addons.forEach((a) => {
+          productDetails += `\n  • ${a.name} (+Rp ${a.price.toLocaleString('id-ID')})`;
+        });
+      }
+      
       const priceText = `Rp ${product.price?.toLocaleString('id-ID') || 0}`;
+      const stockText = product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited";
       
       return [
-        product.name,
+        (idx + 1).toString(),
+        `PRD-${String(idx + 1).padStart(3, '0')}`,
+        productDetails,
         priceText,
-        variantText,
-        addonText,
-        product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited",
+        stockText,
       ];
     });
 
     autoTable(doc, {
-      startY: 40,
-      head: [["Nama Produk", "Harga", "Varian", "Add-on", "Stok"]],
+      startY: infoY + 2 * boxHeight + 2 * gap + 10,
+      head: [["No", "Kode", "Nama Produk & Detail", "Harga Dasar", "Stok"]],
       body: tableData,
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [59, 130, 246] },
-      columnStyles: {
-        1: { halign: 'right' }, // Price align right
-        2: { halign: 'center' }, // Variant count center
-        3: { halign: 'center' }, // Addon count center
-        4: { halign: 'center' }, // Stock center
+      styles: { 
+        fontSize: 9,
+        font: 'helvetica',
+        cellPadding: { top: 2, right: 1.5, bottom: 2, left: 1.5 },
+        textColor: [51, 51, 51],
+        lineColor: [221, 221, 221],
+        lineWidth: 0.1
       },
+      headStyles: { 
+        fillColor: [51, 51, 51],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 10,
+        halign: 'left',
+        cellPadding: { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 }
+      },
+      alternateRowStyles: {
+        fillColor: [250, 250, 250]
+      },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 80 }, // Wider for details
+        3: { cellWidth: 30, halign: 'right' },
+        4: { cellWidth: 18, halign: 'center' }
+      }
+    });
+
+    // === FOOTER ===
+    const finalY = (doc as any).lastAutoTable.finalY + 20;
+    const signBoxWidth = 55;
+    const signBoxGap = ((pageWidth - 40) - (3 * signBoxWidth)) / 2;
+    
+    const signatures = [
+      { label: 'Dibuat Oleh,', x: 20 },
+      { label: 'Diperiksa Oleh,', x: 20 + signBoxWidth + signBoxGap },
+      { label: 'Disetujui Oleh,', x: 20 + 2 * (signBoxWidth + signBoxGap) }
+    ];
+    
+    signatures.forEach((sig) => {
+      doc.setFillColor(249, 249, 249);
+      doc.rect(sig.x, finalY, signBoxWidth, 35, 'F');
+      doc.setDrawColor(221, 221, 221);
+      doc.setLineWidth(0.3);
+      doc.rect(sig.x, finalY, signBoxWidth, 35, 'S');
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(51, 51, 51);
+      doc.text(sig.label, sig.x + 3, finalY + 5);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(102, 102, 102);
+      doc.text('Nama:', sig.x + 3, finalY + 25);
+      doc.text('Tanggal:', sig.x + 3, finalY + 32);
     });
 
     doc.save("Katalog_Produk_Tim.pdf");

@@ -151,26 +151,42 @@ export default function AdminProductView() {
 
     // === TABLE (matching print.html structure) ===
     const tableData = team.products.map((product, idx) => {
-      const variantCount = (product as any).variants?.length || 0;
-      const addonCount = (product as any).addons?.length || 0;
-      const variantText = variantCount > 0 ? `${variantCount} varian` : "-";
-      const addonText = addonCount > 0 ? `${addonCount} add-on` : "-";
-      const priceText = `Rp ${(product as any).price?.toLocaleString('id-ID') || 0}`;
+      // Build product details with variants and addons
+      let productDetails = product.name;
+      const variants = (product as any).variants || [];
+      const addons = (product as any).addons || [];
+      
+      if (variants.length > 0) {
+        productDetails += '\n  Varian:';
+        variants.forEach((v: any) => {
+          const priceStr = v.additionalPrice > 0 ? ` (+Rp ${v.additionalPrice.toLocaleString('id-ID')})` : '';
+          const reqStr = v.isRequired ? ' [Wajib]' : '';
+          productDetails += `\n  • ${v.name}${priceStr}${reqStr}`;
+        });
+      }
+      
+      if (addons.length > 0) {
+        productDetails += '\n  Add-on:';
+        addons.forEach((a: any) => {
+          productDetails += `\n  • ${a.name} (+Rp ${a.price.toLocaleString('id-ID')})`;
+        });
+      }
+      
+      const priceText = `Rp ${((product as any).price || 0).toLocaleString('id-ID')}`;
+      const stockText = product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited";
       
       return [
         (idx + 1).toString(),
         `PRD-${String(idx + 1).padStart(3, '0')}`,
-        product.name,
+        productDetails,
         priceText,
-        variantText,
-        addonText,
-        product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited",
+        stockText,
       ];
     });
 
     autoTable(doc, {
       startY: infoY + 2 * boxHeight + 2 * gap + 10,
-      head: [["No", "Kode", "Nama Produk", "Harga", "Varian", "Add-on", "Stok"]],
+      head: [["No", "Kode", "Nama Produk & Detail", "Harga Dasar", "Stok"]],
       body: tableData,
       styles: { 
         fontSize: 9, // smaller untuk fit
@@ -194,11 +210,9 @@ export default function AdminProductView() {
       columnStyles: {
         0: { cellWidth: 10, halign: 'center' }, // No
         1: { cellWidth: 22 }, // Kode
-        2: { cellWidth: 40 }, // Nama Produk
-        3: { cellWidth: 28, halign: 'right' }, // Harga
-        4: { cellWidth: 22, halign: 'center' }, // Varian
-        5: { cellWidth: 22, halign: 'center' }, // Add-on
-        6: { cellWidth: 18, halign: 'center' } // Stok
+        2: { cellWidth: 85 }, // Nama Produk & Detail (wider)
+        3: { cellWidth: 30, halign: 'right' }, // Harga Dasar
+        4: { cellWidth: 18, halign: 'center' } // Stok
       }
     });
 
@@ -253,7 +267,7 @@ export default function AdminProductView() {
       doc.line(20, 38, pageWidth - 20, 38);
       
       let yPos = 50;
-      const labelHeight = 45;
+      const labelHeight = 60; // Increased from 45 to accommodate more text
       const labelWidth = pageWidth - 40;
       const margin = 20;
       
@@ -287,22 +301,50 @@ export default function AdminProductView() {
         doc.setFont('helvetica', 'bold');
         doc.text(`${index + 1}. ${product.name}`, margin + 8, yPos + 12);
         
-        // Price, variant count, addon count, and stock
-        doc.setFontSize(12);
+        // Price
+        doc.setFontSize(11);
         doc.setFont('helvetica', 'normal');
-        const priceText = `Harga: Rp ${((product as any).price || 0).toLocaleString('id-ID')}`;
+        const priceText = `Harga Dasar: Rp ${((product as any).price || 0).toLocaleString('id-ID')}`;
         doc.text(priceText, margin + 8, yPos + 22);
         
-        const variantCount = (product as any).variants?.length || 0;
-        const addonCount = (product as any).addons?.length || 0;
-        const variantText = variantCount > 0 ? `${variantCount} varian` : 'Tanpa varian';
-        const addonText = addonCount > 0 ? `${addonCount} add-on` : 'Tanpa add-on';
-        doc.text(`${variantText}, ${addonText}`, margin + 8, yPos + 29);
+        // Variants detail
+        let currentY = yPos + 28;
+        const variants = (product as any).variants || [];
+        if (variants.length > 0) {
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Varian:', margin + 8, currentY);
+          currentY += 4;
+          doc.setFont('helvetica', 'normal');
+          variants.forEach((v: any) => {
+            const vText = `• ${v.name} (+Rp ${v.additionalPrice.toLocaleString('id-ID')})`;
+            doc.text(vText, margin + 10, currentY);
+            currentY += 3.5;
+          });
+        }
         
+        // Addons detail  
+        const addons = (product as any).addons || [];
+        if (addons.length > 0) {
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Add-on:', margin + 8, currentY);
+          currentY += 4;
+          doc.setFont('helvetica', 'normal');
+          addons.forEach((a: any) => {
+            const aText = `• ${a.name} (+Rp ${a.price.toLocaleString('id-ID')})`;
+            doc.text(aText, margin + 10, currentY);
+            currentY += 3.5;
+          });
+        }
+        
+        // Stock at bottom
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
         const stockText = product.stock !== null && product.stock !== undefined 
           ? `Stok: ${product.stock}` 
           : 'Stok: Unlimited';
-        doc.text(stockText, margin + 8, yPos + 36);
+        doc.text(stockText, margin + 8, yPos + labelHeight - 5);
         
         // Team name (bottom right, smaller)
         doc.setFontSize(10);
@@ -412,26 +454,42 @@ export default function AdminProductView() {
         allProducts.push({ product, teamName: team.name || "Tim", productIndex: globalIndex });
         globalIndex++;
         
-        const variantCount = (product as any).variants?.length || 0;
-        const addonCount = (product as any).addons?.length || 0;
-        const variantText = variantCount > 0 ? `${variantCount} varian` : "-";
-        const addonText = addonCount > 0 ? `${addonCount} add-on` : "-";
+        // Build product details with variants and addons
+        let productDetails = product.name;
+        const variants = (product as any).variants || [];
+        const addons = (product as any).addons || [];
+        
+        if (variants.length > 0) {
+          productDetails += '\n  Varian:';
+          variants.forEach((v: any) => {
+            const priceStr = v.additionalPrice > 0 ? ` (+Rp ${v.additionalPrice.toLocaleString('id-ID')})` : '';
+            const reqStr = v.isRequired ? ' [Wajib]' : '';
+            productDetails += `\n  • ${v.name}${priceStr}${reqStr}`;
+          });
+        }
+        
+        if (addons.length > 0) {
+          productDetails += '\n  Add-on:';
+          addons.forEach((a: any) => {
+            productDetails += `\n  • ${a.name} (+Rp ${a.price.toLocaleString('id-ID')})`;
+          });
+        }
+        
         const priceText = `Rp ${((product as any).price || 0).toLocaleString('id-ID')}`;
+        const stockText = product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited";
         
         return [
           (idx + 1).toString(),
           `PRD-${String(globalIndex).padStart(3, '0')}`,
-          product.name,
+          productDetails,
           priceText,
-          variantText,
-          addonText,
-          product.stock !== null && product.stock !== undefined ? product.stock.toString() : "Unlimited",
+          stockText,
         ];
       });
 
       autoTable(doc, {
         startY: infoY + 2 * boxHeight + 2 * gap + 10,
-        head: [["No", "Kode", "Nama Produk", "Harga", "Varian", "Add-on", "Stok"]],
+        head: [["No", "Kode", "Nama Produk & Detail", "Harga Dasar", "Stok"]],
         body: tableData,
         styles: { 
           fontSize: 10,
@@ -455,11 +513,9 @@ export default function AdminProductView() {
         columnStyles: {
           0: { cellWidth: 10, halign: 'center' }, // No
           1: { cellWidth: 22 }, // Kode
-          2: { cellWidth: 50 }, // Nama Produk
-          3: { cellWidth: 28, halign: 'right' }, // Harga
-          4: { cellWidth: 22, halign: 'center' }, // Varian
-          5: { cellWidth: 22, halign: 'center' }, // Add-on
-          6: { cellWidth: 18, halign: 'center' } // Stok
+          2: { cellWidth: 85 }, // Nama Produk & Detail (wider)
+          3: { cellWidth: 30, halign: 'right' }, // Harga Dasar
+          4: { cellWidth: 18, halign: 'center' } // Stok
         }
       });
       
@@ -515,7 +571,7 @@ export default function AdminProductView() {
       doc.line(20, 38, pageWidth - 20, 38);
       
       let yPos = 50;
-      const labelHeight = 45;
+      const labelHeight = 60; // Increased to accommodate more text
       const labelWidth = pageWidth - 40;
       const margin = 20;
       
@@ -549,22 +605,50 @@ export default function AdminProductView() {
         doc.setFont('helvetica', 'bold');
         doc.text(entry.product.name, margin + 8, yPos + 12);
         
-        // Price, variant count, addon count, and stock
-        doc.setFontSize(12);
+        // Price
+        doc.setFontSize(11);
         doc.setFont('helvetica', 'normal');
-        const priceText = `Harga: Rp ${((entry.product as any).price || 0).toLocaleString('id-ID')}`;
+        const priceText = `Harga Dasar: Rp ${((entry.product as any).price || 0).toLocaleString('id-ID')}`;
         doc.text(priceText, margin + 8, yPos + 22);
         
-        const variantCount = (entry.product as any).variants?.length || 0;
-        const addonCount = (entry.product as any).addons?.length || 0;
-        const variantText = variantCount > 0 ? `${variantCount} varian` : 'Tanpa varian';
-        const addonText = addonCount > 0 ? `${addonCount} add-on` : 'Tanpa add-on';
-        doc.text(`${variantText}, ${addonText}`, margin + 8, yPos + 29);
+        // Variants detail
+        let currentY = yPos + 28;
+        const variants = (entry.product as any).variants || [];
+        if (variants.length > 0) {
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Varian:', margin + 8, currentY);
+          currentY += 4;
+          doc.setFont('helvetica', 'normal');
+          variants.forEach((v: any) => {
+            const vText = `• ${v.name} (+Rp ${v.additionalPrice.toLocaleString('id-ID')})`;
+            doc.text(vText, margin + 10, currentY);
+            currentY += 3.5;
+          });
+        }
         
+        // Addons detail
+        const addons = (entry.product as any).addons || [];
+        if (addons.length > 0) {
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Add-on:', margin + 8, currentY);
+          currentY += 4;
+          doc.setFont('helvetica', 'normal');
+          addons.forEach((a: any) => {
+            const aText = `• ${a.name} (+Rp ${a.price.toLocaleString('id-ID')})`;
+            doc.text(aText, margin + 10, currentY);
+            currentY += 3.5;
+          });
+        }
+        
+        // Stock at bottom left
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
         const stockText = entry.product.stock !== null && entry.product.stock !== undefined 
           ? `Stok: ${entry.product.stock}` 
           : 'Stok: Unlimited';
-        doc.text(stockText, margin + 8, yPos + 36);
+        doc.text(stockText, margin + 8, yPos + labelHeight - 5);
         
         // Team name (bottom right, smaller)
         doc.setFontSize(10);
