@@ -3,7 +3,7 @@ TESTTTTTTTTTTTT
 
 ## Deskripsi
 Fitur inventaris untuk mendata barang-barang yang akan dibawa oleh peserta saat hari-H bazaar. Sistem ini memiliki form dinamis yang menyesuaikan field input berdasarkan kategori barang yang dipilih.
-
+git 
 ## Fitur Utama
 
 ### 1. **Untuk Peserta**
