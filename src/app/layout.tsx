@@ -6,6 +6,7 @@ import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import AuthContext from '@/context/AuthContext';
 import { DialogProvider } from '@/context/DialogContext';
+import WhatsAppSupport from '@/components/common/WhatsAppSupport';
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -29,6 +30,7 @@ export default function RootLayout({
           <ThemeProvider>
             <DialogProvider>
               <SidebarProvider>{children}</SidebarProvider>
+              <WhatsAppSupport />
             </DialogProvider>
           </ThemeProvider>
         </AuthContext>
