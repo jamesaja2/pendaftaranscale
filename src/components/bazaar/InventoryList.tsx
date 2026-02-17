@@ -116,7 +116,8 @@ export default function InventoryList({ items, onRefresh, editable = true }: Inv
         <div className="flex justify-end">
           <button
             onClick={() => setShowAddForm(true)}
-            className="rounded-lg border border-blue-600 bg-blue-600 px-6 py-3 font-semibold text-white shadow-lg transition hover:bg-blue-700 hover:shadow-xl dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600"
+            className="rounded-lg !bg-blue-600 px-6 py-3 font-semibold !text-white shadow-xl transition hover:!bg-blue-700 hover:scale-105 dark:!bg-blue-500 dark:hover:!bg-blue-600"
+            style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
           >
             + Tambah Item
           </button>
