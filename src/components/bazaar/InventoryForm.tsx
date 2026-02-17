@@ -398,7 +398,8 @@ export default function InventoryForm({ item, onSuccess, onCancel }: InventoryFo
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 rounded-lg bg-primary px-6 py-3 text-white transition hover:bg-primary/90 disabled:opacity-50"
+          className="flex-1 rounded-lg !bg-blue-600 px-6 py-3 !text-white shadow-lg transition hover:!bg-blue-700 hover:scale-105 disabled:opacity-50 dark:!bg-blue-500 dark:hover:!bg-blue-600"
+          style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
         >
           {isSubmitting ? "Menyimpan..." : item ? "Update Item" : "Tambah Item"}
         </button>

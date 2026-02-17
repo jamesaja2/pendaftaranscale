@@ -93,7 +93,8 @@ export default function ProductList({ products, onRefresh, editable = true }: Pr
         <div className="flex justify-end">
           <button
             onClick={() => setShowAddForm(true)}
-            className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+            className="rounded-lg !bg-blue-600 px-6 py-3 font-semibold !text-white shadow-xl transition hover:!bg-blue-700 hover:scale-105 dark:!bg-blue-500 dark:hover:!bg-blue-600"
+            style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
           >
             + Tambah Produk
           </button>

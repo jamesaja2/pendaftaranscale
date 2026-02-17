@@ -494,7 +494,8 @@ export default function ProductForm({ product, onSuccess, onCancel }: ProductFor
         <button
           type="submit"
           disabled={isSubmitting || isUploading}
-          className="flex-1 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+          className="flex-1 rounded-lg !bg-blue-600 px-6 py-3 font-semibold !text-white shadow-lg transition hover:!bg-blue-700 hover:scale-105 disabled:opacity-50 dark:!bg-blue-500 dark:hover:!bg-blue-600"
+          style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
         >
           {isSubmitting ? "Menyimpan..." : product ? "Update Produk" : "Tambah Produk"}
         </button>
@@ -512,7 +513,8 @@ export default function ProductForm({ product, onSuccess, onCancel }: ProductFor
             type="button"
             onClick={handleDelete}
             disabled={isSubmitting}
-            className="rounded-lg bg-red-500 px-6 py-3 text-white transition hover:bg-red-600 disabled:opacity-50"
+            className="rounded-lg !bg-red-500 px-6 py-3 !text-white shadow-lg transition hover:!bg-red-600 hover:scale-105 disabled:opacity-50"
+            style={{ backgroundColor: '#ef4444', color: '#ffffff' }}
           >
             Hapus
           </button>
