@@ -155,36 +155,61 @@ export default function AdminInventoryView() {
 
     // === TABLE (matching print.html structure) ===
     const tableData = team.inventoryItems.map((item, idx) => {
-      const specs = [];
+      // Build item details with all specifications
+      let itemDetails = item.name;
+      itemDetails += `\n  Kategori: ${getCategoryLabel(item.category)}`;
+      itemDetails += `\n  Kondisi: ${item.condition || "Baik"}`;
+      
+      // Add category-specific specs
       if (item.category === "ELEKTRONIK") {
-        if (item.watt) specs.push(`${item.watt}W`);
-        if (item.ampere) specs.push(`${item.ampere}A`);
-        if (item.voltage) specs.push(`${item.voltage}V`);
-        if (item.brand) specs.push(item.brand);
-      } else if (item.material) {
-        specs.push(item.material);
+        const electronicSpecs = [];
+        if (item.watt) electronicSpecs.push(`Watt: ${item.watt}W`);
+        if (item.ampere) electronicSpecs.push(`Ampere: ${item.ampere}A`);
+        if (item.voltage) electronicSpecs.push(`Voltage: ${item.voltage}V`);
+        if (item.brand) electronicSpecs.push(`Brand: ${item.brand}`);
+        if (electronicSpecs.length > 0) {
+          itemDetails += `\n  Spesifikasi: ${electronicSpecs.join(', ')}`;
+        }
       }
-      if (item.dimensions) specs.push(item.dimensions);
+      
+      // Add material, dimensions, weight for other categories
+      if (item.material) {
+        itemDetails += `\n  Material: ${item.material}`;
+      }
+      if (item.dimensions) {
+        itemDetails += `\n  Dimensi: ${item.dimensions}`;
+      }
+      if (item.weight) {
+        itemDetails += `\n  Berat: ${item.weight}kg`;
+      }
+      
+      // Add description if exists
+      if (item.description) {
+        itemDetails += `\n  Deskripsi: ${item.description}`;
+      }
+      
+      // Add notes if exists
+      if (item.notes) {
+        itemDetails += `\n  ⚠ Catatan: ${item.notes}`;
+      }
 
       return [
         (idx + 1).toString(),
         `INV-${String(idx + 1).padStart(3, '0')}`,
-        item.name,
-        getCategoryLabel(item.category),
+        itemDetails,
         `${item.quantity} ${item.unit || "pcs"}`,
-        item.condition || "Baik",
-        specs.join(", ") || "-",
+        '', // Kolom kosong untuk catatan panitia
       ];
     });
 
     autoTable(doc, {
       startY: infoY + 2 * boxHeight + 2 * gap + 10,
-      head: [["No", "Kode", "Nama Barang", "Kategori", "Jumlah", "Kondisi", "Lokasi"]],
+      head: [["No", "Kode", "Nama Barang & Detail", "Jumlah", "Catatan Panitia"]],
       body: tableData,
       styles: { 
-          fontSize: 10, // smaller untuk fit
+          fontSize: 9, // smaller untuk fit
           font: 'helvetica',
-          cellPadding: { top: 2, right: 1.5, bottom: 2, left: 1.5 },
+          cellPadding: { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 },
           textColor: [51, 51, 51],
           lineColor: [221, 221, 221],
           lineWidth: 0.1
@@ -193,7 +218,7 @@ export default function AdminInventoryView() {
           fillColor: [51, 51, 51], // #333
           textColor: [255, 255, 255],
           fontStyle: 'bold',
-          fontSize: 10,
+          fontSize: 9,
           halign: 'left',
           cellPadding: { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 }
         },
@@ -203,11 +228,9 @@ export default function AdminInventoryView() {
         columnStyles: {
           0: { cellWidth: 10, halign: 'center' }, // No
           1: { cellWidth: 20 }, // Kode
-          2: { cellWidth: 50 }, // Nama - reduced
-          3: { cellWidth: 25 }, // Kategori
-          4: { cellWidth: 18, halign: 'center' }, // Jumlah
-          5: { cellWidth: 20 }, // Kondisi
-          6: { cellWidth: 27 } // Lokasi
+          2: { cellWidth: 85 }, // Nama Barang & Detail (wider)
+          3: { cellWidth: 22, halign: 'center' }, // Jumlah
+          4: { cellWidth: 33 } // Catatan Panitia (kolom kosong)
         }
       });
 
@@ -411,36 +434,61 @@ export default function AdminInventoryView() {
         allItems.push({ item, teamName: team.name || "Tim", itemIndex: globalIndex });
         globalIndex++;
         
-        const specs = [];
+        // Build item details with all specifications
+        let itemDetails = item.name;
+        itemDetails += `\n  Kategori: ${getCategoryLabel(item.category)}`;
+        itemDetails += `\n  Kondisi: ${item.condition || "Baik"}`;
+        
+        // Add category-specific specs
         if (item.category === "ELEKTRONIK") {
-          if (item.watt) specs.push(`${item.watt}W`);
-          if (item.ampere) specs.push(`${item.ampere}A`);
-          if (item.voltage) specs.push(`${item.voltage}V`);
-          if (item.brand) specs.push(item.brand);
-        } else if (item.material) {
-          specs.push(item.material);
+          const electronicSpecs = [];
+          if (item.watt) electronicSpecs.push(`Watt: ${item.watt}W`);
+          if (item.ampere) electronicSpecs.push(`Ampere: ${item.ampere}A`);
+          if (item.voltage) electronicSpecs.push(`Voltage: ${item.voltage}V`);
+          if (item.brand) electronicSpecs.push(`Brand: ${item.brand}`);
+          if (electronicSpecs.length > 0) {
+            itemDetails += `\n  Spesifikasi: ${electronicSpecs.join(', ')}`;
+          }
         }
-        if (item.dimensions) specs.push(item.dimensions);
+        
+        // Add material, dimensions, weight for other categories
+        if (item.material) {
+          itemDetails += `\n  Material: ${item.material}`;
+        }
+        if (item.dimensions) {
+          itemDetails += `\n  Dimensi: ${item.dimensions}`;
+        }
+        if (item.weight) {
+          itemDetails += `\n  Berat: ${item.weight}kg`;
+        }
+        
+        // Add description if exists
+        if (item.description) {
+          itemDetails += `\n  Deskripsi: ${item.description}`;
+        }
+        
+        // Add notes if exists
+        if (item.notes) {
+          itemDetails += `\n  ⚠ Catatan: ${item.notes}`;
+        }
 
         return [
           (idx + 1).toString(),
           `INV-${String(globalIndex).padStart(3, '0')}`,
-          item.name,
-          getCategoryLabel(item.category),
+          itemDetails,
           `${item.quantity} ${item.unit || "pcs"}`,
-          item.condition || "Baik",
-          specs.join(", ") || "-",
+          '', // Kolom kosong untuk catatan panitia
         ];
       });
 
       autoTable(doc, {
         startY: infoY + 2 * boxHeight + 2 * gap + 10,
-        head: [["No", "Kode", "Nama Barang", "Kategori", "Jumlah", "Kondisi", "Lokasi"]],
+        head: [["No", "Kode", "Nama Barang & Detail", "Jumlah", "Catatan Panitia"]],
         body: tableData,
         styles: { 
-          fontSize: 10,
+          fontSize: 9,
           font: 'helvetica',
-          cellPadding: { top: 2, right: 1.5, bottom: 2, left: 1.5 },
+          cellPadding: { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 },
           textColor: [51, 51, 51],
           lineColor: [221, 221, 221],
           lineWidth: 0.1
@@ -449,7 +497,7 @@ export default function AdminInventoryView() {
           fillColor: [51, 51, 51], // #333
           textColor: [255, 255, 255],
           fontStyle: 'bold',
-          fontSize: 10,
+          fontSize: 9,
           halign: 'left',
           cellPadding: { top: 2.5, right: 1.5, bottom: 2.5, left: 1.5 }
         },
@@ -457,13 +505,11 @@ export default function AdminInventoryView() {
           fillColor: [250, 250, 250] // #fafafa
         },
         columnStyles: {
-          0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 20 },
-          2: { cellWidth: 50 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 18, halign: 'center' },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 27 }
+          0: { cellWidth: 10, halign: 'center' }, // No
+          1: { cellWidth: 20 }, // Kode
+          2: { cellWidth: 85 }, // Nama Barang & Detail (wider)
+          3: { cellWidth: 22, halign: 'center' }, // Jumlah
+          4: { cellWidth: 33 } // Catatan Panitia (kolom kosong)
         }
       });
       
