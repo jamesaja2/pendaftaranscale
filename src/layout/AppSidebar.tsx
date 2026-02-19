@@ -51,6 +51,11 @@ const participantItems: NavItem[] = [
     name: "Katalog Produk",
     path: "/my-products",
   },
+  {
+    icon: <PageIcon />,
+    name: "Saldo & Payout",
+    path: "/my-payout",
+  },
 ];
 
 const participantVotingItem: NavItem = {
@@ -93,6 +98,11 @@ const othersItems: NavItem[] = [
     icon: <BoxCubeIcon />,
     name: "Booth Management", // Slot Stand
     path: "/booths",
+  },
+  {
+    icon: <PageIcon />,
+    name: "Payout Management",
+    path: "/payouts",
   },
   {
     icon: <PlugInIcon />,
